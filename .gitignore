@@ -1,0 +1,19 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+target/
+# Editor directories and files
+.vscode/*
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.direnv
+.envrc
+.pre-commit-config.yaml

@@ -1,0 +1,16 @@
+{
+  "name": "taiyaq-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "staff-panel",
+    "display-screen",
+    "user-display"
+  ],
+  "scripts": {
+    "dev:staff": "pnpm --filter @taiyaq/staff-panel dev",
+    "dev:display": "pnpm --filter @taiyaq/display-screen dev",
+    "dev:user": "pnpm --filter @taiyaq/user-display dev",
+    "build": "pnpm --filter @taiyaq/staff-panel build && pnpm --filter @taiyaq/display-screen build && pnpm --filter @taiyaq/user-display build"
+  }
+}
