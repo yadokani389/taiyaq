@@ -1,4 +1,5 @@
 {
+  pkgs,
   lib,
   rustPlatform,
 }:
@@ -20,6 +21,14 @@ rustPlatform.buildRustPackage {
     };
 
   cargoDeps = rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
+
+  nativeBuildInputs = with pkgs; [
+    pkg-config
+  ];
+
+  buildInputs = with pkgs; [
+    openssl
+  ];
 
   doCheck = false;
 

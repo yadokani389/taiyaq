@@ -94,7 +94,9 @@
                 treefmt.enable = true;
                 clippy = {
                   enable = true;
-                  settings.extraArgs = "--manifest-path src-tauri/Cargo.toml";
+                  packageOverrides.cargo = rust-toolchain;
+                  packageOverrides.clippy = rust-toolchain;
+                  settings.extraArgs = "--manifest-path backend/Cargo.toml";
                 };
               };
             };
