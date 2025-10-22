@@ -36,18 +36,20 @@
 
 - **レスポンス:**
 
-    ```json
-    {
-        "ready": [ // 受け取り可能
-            { "id": 101 },
-            { "id": 102 }
-        ],
-        "cooking": [ // 現在調理中
-            { "id": 103 },
-            { "id": 104 }
-        ]
-    }
-    ```
+  ```json
+  {
+    "ready": [
+      // 受け取り可能
+      { "id": 101 },
+      { "id": 102 }
+    ],
+    "cooking": [
+      // 現在調理中
+      { "id": 103 },
+      { "id": 104 }
+    ]
+  }
+  ```
 
 #### `GET /api/orders/{id}`
 
@@ -57,15 +59,15 @@
   - `id`: 注文番号 (integer)
 - **レスポンス:**
 
-    ```json
-    {
-        "id": 105,
-        "status": "waiting", // 現在のステータス
-        "estimatedWaitMinutes": 15 // 受け取り可能になるまでの推定時間(分)。ready, completedの場合はnull
-    }
-    ```
+  ```json
+  {
+    "id": 105,
+    "status": "waiting", // 現在のステータス
+    "estimatedWaitMinutes": 15 // 受け取り可能になるまでの推定時間(分)。ready, completedの場合はnull
+  }
+  ```
 
-    *推定時間の計算は、前の注文数や厨房の生産能力からバックエンドで計算することを想定しています。*
+  _推定時間の計算は、前の注文数や厨房の生産能力からバックエンドで計算することを想定しています。_
 
 ### 【スタッフ向けAPI】
 
@@ -83,14 +85,14 @@
 
 - **リクエストボディ:**
 
-    ```json
-    {
-        "items": [
-            { "flavor": "tsubuan", "quantity": 5 },
-            { "flavor": "custard", "quantity": 10 }
-        ]
-    }
-    ```
+  ```json
+  {
+    "items": [
+      { "flavor": "tsubuan", "quantity": 5 },
+      { "flavor": "custard", "quantity": 10 }
+    ]
+  }
+  ```
 
 - **レスポンス:** `201 Created` と作成された `Order` オブジェクト
 
@@ -100,27 +102,25 @@
 
 - **リクエストボディ:**
 
-    ```json
-    {
-        "items": [
-            { "flavor": "tsubuan", "quantity": 20 },
-            { "flavor": "custard", "quantity": 20 }
-        ]
-    }
-    ```
+  ```json
+  {
+    "items": [
+      { "flavor": "tsubuan", "quantity": 20 },
+      { "flavor": "custard", "quantity": 20 }
+    ]
+  }
+  ```
 
 - **レスポンス:**
 
-    ```json
-    {
-        // この報告によって新たに「準備完了」になった注文番号のリスト
-        "newlyReadyOrders": [ 101, 102 ],
-        // どの注文にも割り当てられなかった在庫
-        "unallocatedItems": [
-            { "flavor": "tsubuan", "quantity": 5 }
-        ]
-    }
-    ```
+  ```json
+  {
+    // この報告によって新たに「準備完了」になった注文番号のリスト
+    "newlyReadyOrders": [101, 102],
+    // どの注文にも割り当てられなかった在庫
+    "unallocatedItems": [{ "flavor": "tsubuan", "quantity": 5 }]
+  }
+  ```
 
 #### `POST /api/staff/orders/{id}/complete`
 
@@ -148,12 +148,12 @@
   - `id`: 注文番号 (integer)
 - **リクエストボディ:**
 
-    ```json
-    {
-        "channel": "discord" | "email" | "line",
-        "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
-    }
-    ```
+  ```json
+  {
+      "channel": "discord" | "email" | "line",
+      "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
+  }
+  ```
 
 - **レスポンス:** `200 OK` と更新された `Order` オブジェクト
 

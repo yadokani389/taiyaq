@@ -74,6 +74,7 @@
               nixfmt.enable = true;
               rustfmt.enable = true;
               taplo.enable = true;
+              prettier.enable = true;
             };
 
             settings.formatter = {
