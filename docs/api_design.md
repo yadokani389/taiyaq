@@ -140,11 +140,9 @@
 - **リクエストボディ:** (なし)
 - **レスポンス:** 更新された `Order` オブジェクト (statusが `cancelled` になる)
 
-### 【Bot向けAPI (内部用)】
+#### `PUT /api/staff/orders/{id}/notification` (新規)
 
-#### `PUT /api/orders/{id}/notification` (新規)
-
-BotがこのAPIを呼び出して、注文に通知先を登録します。
+注文に通知先を登録します。
 
 - **パスパラメータ:**
   - `id`: 注文番号 (integer)

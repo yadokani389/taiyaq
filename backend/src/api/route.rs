@@ -19,13 +19,12 @@ pub fn routes() -> Router<AppRegistry> {
         .route("/staff/orders", get(get_staff_orders).post(create_order))
         .route("/staff/production", post(update_production))
         .route("/staff/orders/{id}/complete", post(complete_order))
-        .route("/staff/orders/{id}/cancel", post(cancel_order));
-
-    let bot_routes = Router::new().route("/orders/{id}/notification", put(add_notification));
+        .route("/staff/orders/{id}/cancel", post(cancel_order))
+        .route("/staff/orders/{id}/notification", put(add_notification));
 
     let line_router = Router::new().route("/line_callback", post(line_callback));
 
     Router::new()
-        .nest("/api", user_routes.merge(staff_routes).merge(bot_routes))
+        .nest("/api", user_routes.merge(staff_routes))
         .merge(line_router)
 }

@@ -19,6 +19,40 @@ pub struct AddNotificationRequest {
     pub target: String,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct StaffOrdersQuery {
+    #[serde(default, deserialize_with = "csv_to_order_status")]
+    pub status: Vec<OrderStatus>,
+}
+
+// Custom deserializer for comma-separated order status strings
+fn csv_to_order_status<'de, D>(deserializer: D) -> Result<Vec<OrderStatus>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.is_empty() {
+        return Ok(Vec::new());
+    }
+    s.split(',')
+        .filter(|s| !s.trim().is_empty()) // Filter out empty strings resulting from trailing commas etc.
+        .map(|s_trim| {
+            let s = s_trim.trim();
+            match s {
+                "waiting" => Ok(OrderStatus::Waiting),
+                "cooking" => Ok(OrderStatus::Cooking),
+                "ready" => Ok(OrderStatus::Ready),
+                "completed" => Ok(OrderStatus::Completed),
+                "cancelled" => Ok(OrderStatus::Cancelled),
+                _ => Err(serde::de::Error::custom(format!(
+                    "invalid order status: '{}'",
+                    s
+                ))),
+            }
+        })
+        .collect()
+}
+
 //==// Response Bodies //==//
 
 #[derive(Serialize)]

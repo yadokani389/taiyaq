@@ -111,15 +111,13 @@ curl -X GET "${BASE_URL}/api/orders/1"
 curl -X GET "${BASE_URL}/api/orders/3"
 ```
 
-## 6. ボットAPI: 通知の追加
-
 注文の通知先を設定します。
 
-### `PUT /api/orders/{id}/notification`
+### `PUT /api/staff/orders/{id}/notification`
 
 ```bash
 # 注文3にメール通知を追加
-curl -X PUT "${BASE_URL}/api/orders/3/notification" \
+curl -X PUT "${BASE_URL}/api/staff/orders/3/notification" \
      -H "Content-Type: application/json" \
      -d '{
           "channel": "email",
