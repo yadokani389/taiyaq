@@ -3,7 +3,7 @@ use crate::{
         add_notification, cancel_order, complete_order, create_order, get_display_orders,
         get_order_details, get_staff_orders, line_callback, update_production,
     },
-    data::AppRegistry,
+    app::AppRegistry,
 };
 use axum::{
     Router,

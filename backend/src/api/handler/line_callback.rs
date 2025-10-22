@@ -16,7 +16,8 @@ use crate::{
         handler::{display::get_order_details, staff::add_notification},
         model::AddNotificationRequest,
     },
-    data::{AppRegistry, NotifyChannel},
+    app::AppRegistry,
+    data::NotifyChannel,
 };
 
 /// POST /line_callback
@@ -51,25 +52,16 @@ pub async fn line_callback(
                             target: target.clone(),
                         };
 
-                        // Call the internal add_notification handler logic
-                        let result = add_notification(
-                            State(registry.clone()),
-                            Path(order_id),
-                            Json(add_notification_payload),
-                        )
-                        .await;
-
-                        match result {
-                            Ok(_) => {
-                                reply_text = format!(
-                                    "Notification set for order {} to {}.",
-                                    order_id, target
-                                )
-                            }
-                            Err(_) => {
-                                reply_text =
-                                    format!("Failed to set notification for order {}.", order_id)
-                            }
+                        if registry
+                            .add_notification(order_id, add_notification_payload)
+                            .await
+                            .is_some()
+                        {
+                            reply_text =
+                                format!("Notification set for order {} to {}.", order_id, target)
+                        } else {
+                            reply_text =
+                                format!("Failed to set notification for order {}.", order_id)
                         }
                     } else {
                         reply_text = "Invalid order ID for notification.".to_string();

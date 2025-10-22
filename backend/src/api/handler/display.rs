@@ -6,14 +6,16 @@ use axum::{
 
 use crate::{
     api::model::{DisplayOrder, DisplayOrdersResponse, OrderDetailsResponse},
-    data::{AppRegistry, OrderStatus},
+    app::AppRegistry,
+    data::OrderStatus,
 };
 
 /// GET /api/orders/display
 pub async fn get_display_orders(
     State(registry): State<AppRegistry>,
 ) -> Json<DisplayOrdersResponse> {
-    let orders = registry.orders.lock().await;
+    let data_guard = registry.data.lock().await;
+    let orders = &data_guard.orders;
     let ready = orders
         .iter()
         .filter(|o| o.status == OrderStatus::Ready)
@@ -32,7 +34,8 @@ pub async fn get_order_details(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
 ) -> Result<Json<OrderDetailsResponse>, StatusCode> {
-    let orders = registry.orders.lock().await;
+    let data_guard = registry.data.lock().await;
+    let orders = &data_guard.orders;
     if let Some(order) = orders.iter().find(|o| o.id == id) {
         let estimated_wait_minutes = if order.status == OrderStatus::Waiting {
             // Simplified estimation logic: 5 minutes per waiting order ahead of this one.
