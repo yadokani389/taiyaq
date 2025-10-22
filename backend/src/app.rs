@@ -5,7 +5,7 @@ use bot_sdk_line::client::LINE;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
-use crate::api::model::AddNotificationRequest;
+use crate::api::model::{AddNotificationRequest, OrderDetailsResponse};
 use crate::data::{Data, Item, Notify, Order, OrderStatus};
 
 // AppRegistry is the main application state.
@@ -179,5 +179,29 @@ impl AppRegistry {
             "Sending notification for Order ID: {}, Channel: {:?}, Target: {}, Message: {}",
             order_id, notify.channel, notify.target, message
         );
+    }
+
+    pub async fn get_order_details(&self, id: u32) -> Option<OrderDetailsResponse> {
+        let data_guard = self.data.lock().await;
+        let orders = &data_guard.orders;
+        if let Some(order) = orders.iter().find(|o| o.id == id) {
+            let estimated_wait_minutes = if order.status == OrderStatus::Waiting {
+                // Simplified estimation logic: 5 minutes per waiting order ahead of this one.
+                let position = orders
+                    .iter()
+                    .filter(|o| o.status == OrderStatus::Waiting && o.ordered_at < order.ordered_at)
+                    .count();
+                Some((position as i64 + 1) * 5)
+            } else {
+                None
+            };
+            Some(OrderDetailsResponse {
+                id: order.id,
+                status: order.status,
+                estimated_wait_minutes,
+            })
+        } else {
+            None
+        }
     }
 }

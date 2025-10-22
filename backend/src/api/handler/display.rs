@@ -34,24 +34,8 @@ pub async fn get_order_details(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
 ) -> Result<Json<OrderDetailsResponse>, StatusCode> {
-    let data_guard = registry.data.lock().await;
-    let orders = &data_guard.orders;
-    if let Some(order) = orders.iter().find(|o| o.id == id) {
-        let estimated_wait_minutes = if order.status == OrderStatus::Waiting {
-            // Simplified estimation logic: 5 minutes per waiting order ahead of this one.
-            let position = orders
-                .iter()
-                .filter(|o| o.status == OrderStatus::Waiting && o.ordered_at < order.ordered_at)
-                .count();
-            Some((position as i64 + 1) * 5)
-        } else {
-            None
-        };
-        Ok(Json(OrderDetailsResponse {
-            id: order.id,
-            status: order.status,
-            estimated_wait_minutes,
-        }))
+    if let Some(details) = registry.get_order_details(id).await {
+        Ok(Json(details))
     } else {
         Err(StatusCode::NOT_FOUND)
     }

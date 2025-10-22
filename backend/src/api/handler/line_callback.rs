@@ -1,8 +1,4 @@
-use axum::{
-    Json,
-    extract::{Path, State},
-    http::StatusCode,
-};
+use axum::{Json, extract::State, http::StatusCode};
 use bot_sdk_line::{
     messaging_api_line::{
         apis::MessagingApiApi,
@@ -11,11 +7,7 @@ use bot_sdk_line::{
     webhook_line::models::{CallbackRequest, Event, MessageContent},
 };
 
-use crate::{
-    api::{handler::display::get_order_details, model::AddNotificationRequest},
-    app::AppRegistry,
-    data::NotifyChannel,
-};
+use crate::{api::model::AddNotificationRequest, app::AppRegistry, data::NotifyChannel};
 
 /// POST /line_callback
 pub async fn line_callback(
@@ -73,11 +65,8 @@ pub async fn line_callback(
                 if parts.len() == 2 {
                     if let Ok(order_id) = parts[1].parse::<u32>() {
                         // Call the internal get_order_details handler logic
-                        let result =
-                            get_order_details(State(registry.clone()), Path(order_id)).await;
-
-                        match result {
-                            Ok(Json(details)) => {
+                        match registry.get_order_details(order_id).await {
+                            Some(details) => {
                                 reply_text = format!(
                                     "Order {}: Status is {:?}. Estimated wait: {}.",
                                     details.id,
@@ -87,12 +76,7 @@ pub async fn line_callback(
                                         .map_or("N/A".to_string(), |m| format!("{} minutes", m))
                                 );
                             }
-                            Err(StatusCode::NOT_FOUND) => {
-                                reply_text = format!("Order {} not found.", order_id)
-                            }
-                            Err(_) => {
-                                reply_text = format!("Failed to get status for order {}.", order_id)
-                            }
+                            None => reply_text = format!("Order {} not found.", order_id),
                         }
                     } else {
                         reply_text = "Invalid order ID for status inquiry.".to_string();
