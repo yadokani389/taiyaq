@@ -12,10 +12,7 @@ use bot_sdk_line::{
 };
 
 use crate::{
-    api::{
-        handler::{display::get_order_details, staff::add_notification},
-        model::AddNotificationRequest,
-    },
+    api::{handler::display::get_order_details, model::AddNotificationRequest},
     app::AppRegistry,
     data::NotifyChannel,
 };

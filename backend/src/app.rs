@@ -137,7 +137,18 @@ impl AppRegistry {
 
     pub async fn cancel_order(&self, id: u32) -> Option<Order> {
         let mut data = self.data.lock().await;
-        if let Some(order) = data.orders.iter_mut().find(|o| o.id == id) {
+        let Data {
+            ref mut orders,
+            ref mut unallocated_stock,
+        } = *data;
+        if let Some(order) = orders.iter_mut().find(|o| o.id == id) {
+            // If the order was already ready, its items were deducted from unallocated_stock.
+            // When cancelled, these items should be returned to unallocated_stock.
+            if order.status == OrderStatus::Ready {
+                for item in &order.items {
+                    *unallocated_stock.entry(item.flavor.clone()).or_insert(0) += item.quantity;
+                }
+            }
             order.status = OrderStatus::Cancelled;
             Some(order.clone())
         } else {
