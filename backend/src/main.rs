@@ -16,7 +16,8 @@ async fn main() -> anyhow::Result<()> {
     let line_token: String =
         env::var("LINE_CHANNEL_ACCESS_TOKEN").expect("Failed getting LINE_CHANNEL_ACCESS_TOKEN");
 
-    let registry = AppRegistry::from_file(line_token).await?;
+    let registry = AppRegistry::new(line_token);
+    registry.load_data().await.ok();
 
     let app = routes().with_state(registry.clone());
 
