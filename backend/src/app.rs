@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
 use chrono::Utc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
 use crate::api::model::{AddNotificationRequest, OrderDetailsResponse};
 use crate::data::{Data, Item, Notify, Order, OrderStatus};
@@ -11,7 +11,7 @@ use crate::data::{Data, Item, Notify, Order, OrderStatus};
 // AppRegistry is the main application state.
 #[derive(Clone)]
 pub struct AppRegistry {
-    pub data: Arc<Mutex<Data>>,
+    data: Arc<RwLock<Data>>,
     pub line: Arc<Mutex<LINE>>,
 }
 
@@ -20,19 +20,13 @@ impl AppRegistry {
 
     pub fn new(line_token: String) -> Self {
         Self {
-            data: Arc::new(Mutex::new(Data::default())),
+            data: Arc::new(RwLock::new(Data::default())),
             line: Arc::new(Mutex::new(LINE::new(line_token))),
         }
     }
 
-    pub async fn from_file(line_token: String) -> anyhow::Result<Self> {
-        let registry = Self::new(line_token);
-        registry.load_data().await?;
-        Ok(registry)
-    }
-
     pub async fn save_data(&self) -> anyhow::Result<()> {
-        let data_str = serde_json::to_string_pretty(&*self.data.lock().await)?;
+        let data_str = serde_json::to_string_pretty(&*self.data.read().await)?;
         std::fs::write(Self::FILE_PATH, data_str)?;
         Ok(())
     }
@@ -40,13 +34,17 @@ impl AppRegistry {
     pub async fn load_data(&self) -> anyhow::Result<()> {
         let data_str = std::fs::read_to_string(Self::FILE_PATH)?;
         let data: Data = serde_json::from_str(&data_str)?;
-        *self.data.lock().await = data;
+        *self.data.write().await = data;
         Ok(())
+    }
+
+    pub async fn data(&self) -> RwLockReadGuard<'_, Data> {
+        self.data.read().await
     }
 
     // Atomically creates a new order and returns it.
     pub async fn create_order(&self, items: Vec<Item>) -> Order {
-        let mut data = self.data.lock().await;
+        let mut data = self.data.write().await;
         let new_id = data.orders.iter().map(|o| o.id).max().unwrap_or(0) + 1;
         let new_order = Order {
             id: new_id,
@@ -58,12 +56,14 @@ impl AppRegistry {
             notify: None,
         };
         data.orders.push(new_order.clone());
+        drop(data);
+        self.save_data().await.ok();
         new_order
     }
 
     // Updates stock and fulfills waiting orders.
     pub async fn update_production(&self, production: Vec<Item>) -> (Vec<u32>, Vec<Item>) {
-        let mut data = self.data.lock().await;
+        let mut data = self.data.write().await;
 
         for item in production {
             *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
@@ -104,6 +104,8 @@ impl AppRegistry {
             })
             .collect();
 
+        drop(data);
+        self.save_data().await.ok();
         (newly_ready_orders, unallocated_items)
     }
 
@@ -125,35 +127,37 @@ impl AppRegistry {
     }
 
     pub async fn complete_order(&self, id: u32) -> Option<Order> {
-        let mut data = self.data.lock().await;
-        if let Some(order) = data.orders.iter_mut().find(|o| o.id == id) {
-            order.status = OrderStatus::Completed;
-            order.completed_at = Some(Utc::now());
-            Some(order.clone())
-        } else {
-            None
-        }
+        let mut data = self.data.write().await;
+        let order = data.orders.iter_mut().find(|o| o.id == id)?;
+        order.status = OrderStatus::Completed;
+        order.completed_at = Some(Utc::now());
+
+        let order = order.clone();
+        drop(data);
+        self.save_data().await.ok();
+        Some(order)
     }
 
     pub async fn cancel_order(&self, id: u32) -> Option<Order> {
-        let mut data = self.data.lock().await;
+        let mut data = self.data.write().await;
         let Data {
             ref mut orders,
             ref mut unallocated_stock,
         } = *data;
-        if let Some(order) = orders.iter_mut().find(|o| o.id == id) {
-            // If the order was already ready, its items were deducted from unallocated_stock.
-            // When cancelled, these items should be returned to unallocated_stock.
-            if order.status == OrderStatus::Ready {
-                for item in &order.items {
-                    *unallocated_stock.entry(item.flavor.clone()).or_insert(0) += item.quantity;
-                }
+        let order = orders.iter_mut().find(|o| o.id == id)?;
+        // If the order was already ready, its items were deducted from unallocated_stock.
+        // When cancelled, these items should be returned to unallocated_stock.
+        if order.status == OrderStatus::Ready {
+            for item in &order.items {
+                *unallocated_stock.entry(item.flavor.clone()).or_insert(0) += item.quantity;
             }
-            order.status = OrderStatus::Cancelled;
-            Some(order.clone())
-        } else {
-            None
         }
+        order.status = OrderStatus::Cancelled;
+
+        let order = order.clone();
+        drop(data);
+        self.save_data().await.ok();
+        Some(order)
     }
 
     pub async fn add_notification(
@@ -161,16 +165,16 @@ impl AppRegistry {
         id: u32,
         payload: AddNotificationRequest,
     ) -> Option<Order> {
-        let mut data = self.data.lock().await;
-        if let Some(order) = data.orders.iter_mut().find(|o| o.id == id) {
-            order.notify = Some(Notify {
-                channel: payload.channel,
-                target: payload.target,
-            });
-            Some(order.clone())
-        } else {
-            None
-        }
+        let mut data = self.data.write().await;
+        let order = data.orders.iter_mut().find(|o| o.id == id)?;
+        order.notify = Some(Notify {
+            channel: payload.channel,
+            target: payload.target,
+        });
+        let order = order.clone();
+        drop(data);
+        self.save_data().await.ok();
+        Some(order)
     }
 
     pub async fn send_notification(&self, order_id: u32, notify: &Notify, message: String) {
@@ -182,7 +186,7 @@ impl AppRegistry {
     }
 
     pub async fn get_order_details(&self, id: u32) -> Option<OrderDetailsResponse> {
-        let data_guard = self.data.lock().await;
+        let data_guard = self.data.read().await;
         let orders = &data_guard.orders;
         if let Some(order) = orders.iter().find(|o| o.id == id) {
             let estimated_wait_minutes = if order.status == OrderStatus::Waiting {

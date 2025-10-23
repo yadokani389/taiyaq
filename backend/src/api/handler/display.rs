@@ -14,8 +14,7 @@ use crate::{
 pub async fn get_display_orders(
     State(registry): State<AppRegistry>,
 ) -> Json<DisplayOrdersResponse> {
-    let data_guard = registry.data.lock().await;
-    let orders = &data_guard.orders;
+    let orders = &registry.data().await.orders;
     let ready = orders
         .iter()
         .filter(|o| o.status == OrderStatus::Ready)

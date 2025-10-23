@@ -18,8 +18,7 @@ pub async fn get_staff_orders(
     State(registry): State<AppRegistry>,
     Query(query): Query<StaffOrdersQuery>,
 ) -> Json<Vec<Order>> {
-    let data = registry.data.lock().await;
-    let orders = &data.orders;
+    let orders = &registry.data().await.orders;
     let filtered_orders = if query.status.is_empty() {
         orders.clone()
     } else {
