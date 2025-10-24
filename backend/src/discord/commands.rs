@@ -100,35 +100,114 @@ async fn notify(
     ctx: PoiseContext<'_>,
     #[description = "注文ID"] id: u32,
 ) -> Result<(), anyhow::Error> {
-    let target_user = ctx.author().id;
-    let payload = AddNotificationRequest {
-        channel: NotifyChannel::Discord,
-        target: target_user.to_string(),
-    };
+    let registry = ctx.data();
+    let data = registry.data().await;
+    let order = data.orders.iter().find(|o| o.id == id);
 
-    // Check if the order exists and is in a valid state for notifications
-    let order_exists = ctx.data().data().await.orders.iter().any(|o| {
-        o.id == id && o.status != OrderStatus::Completed && o.status != OrderStatus::Cancelled
-    });
-
-    if !order_exists {
-        ctx.say(format!(
-            "注文 `{}` が見つからないか、すでに完了/キャンセルされています。",
-            id
-        ))
-        .await?;
+    if order.is_none() {
+        let builder =
+            poise::CreateReply::default().content(format!("注文 `{}` が見つかりません。", id));
+        ctx.send(builder).await?;
         return Ok(());
     }
 
-    if let Some(order) = ctx.data().add_notification(id, payload).await {
-        ctx.say(format!(
-            "注文 `{}` の通知が設定されました。準備ができた際にお知らせします。",
-            order.id
-        ))
-        .await?;
-    } else {
-        ctx.say(format!("注文 `{}` の通知設定に失敗しました。", id))
-            .await?;
+    let order = order.unwrap().clone();
+    drop(data);
+
+    if order.status == OrderStatus::Completed || order.status == OrderStatus::Cancelled {
+        let builder = poise::CreateReply::default().content(format!(
+            "注文 `{}` はすでに完了/キャンセルされています。",
+            id
+        ));
+        ctx.send(builder).await?;
+        return Ok(());
     }
+
+    let items_str = order
+        .items
+        .iter()
+        .map(|item| format!("- {} x{}", item.flavor, item.quantity))
+        .collect::<Vec<_>>()
+        .join(
+            "
+",
+        );
+
+    let ordered_at_str = format!("<t:{}:F>", order.ordered_at.timestamp());
+
+    let embed = CreateEmbed::default()
+        .title(format!("注文 #{} の通知設定", order.id))
+        .description("以下の注文で通知を登録しますか？")
+        .field("商品", items_str.clone(), false)
+        .field("注文時刻", ordered_at_str.clone(), false)
+        .color(Colour::ORANGE);
+
+    let custom_id_confirm = format!("notify_confirm_{}_{}", id, ctx.id());
+    let custom_id_cancel = format!("notify_cancel_{}_{}", id, ctx.id());
+
+    let builder =
+        poise::CreateReply::default()
+            .embed(embed)
+            .components(vec![CreateActionRow::Buttons(vec![
+                CreateButton::new(custom_id_confirm.clone())
+                    .label("はい、登録する")
+                    .style(ButtonStyle::Success),
+                CreateButton::new(custom_id_cancel.clone())
+                    .label("いいえ")
+                    .style(ButtonStyle::Danger),
+            ])]);
+
+    let reply_handle = ctx.send(builder).await?;
+
+    let interaction = {
+        if let Ok(message) = reply_handle.message().await {
+            message
+                .await_component_interaction(ctx)
+                .author_id(ctx.author().id)
+                .timeout(std::time::Duration::from_secs(60))
+                .await
+        } else {
+            None
+        }
+    };
+
+    let mut edited_embed = CreateEmbed::default()
+        .title(format!("注文 #{} の通知設定", order.id))
+        .field("商品", items_str, false)
+        .field("注文時刻", ordered_at_str, false);
+
+    match interaction {
+        Some(press) => {
+            press.defer(ctx).await?;
+            if press.data.custom_id == custom_id_confirm {
+                let payload = AddNotificationRequest {
+                    channel: NotifyChannel::Discord,
+                    target: ctx.author().id.to_string(),
+                };
+                if registry.add_notification(id, payload).await.is_some() {
+                    edited_embed = edited_embed
+                        .description("通知を登録しました。準備ができたらDMでお知らせします。")
+                        .color(Colour::DARK_GREEN);
+                } else {
+                    edited_embed = edited_embed
+                        .description("エラー：通知の登録に失敗しました。")
+                        .color(Colour::RED);
+                }
+            } else {
+                edited_embed = edited_embed.description("通知の登録をキャンセルしました。");
+            }
+        }
+        None => {
+            edited_embed = edited_embed
+                .description("タイムアウトしました。再度コマンドを実行してください。")
+                .color(Colour::RED);
+        }
+    }
+
+    let builder = poise::CreateReply::default()
+        .embed(edited_embed)
+        .components(vec![]);
+    reply_handle.edit(ctx, builder).await?;
+
     Ok(())
 }

@@ -24,7 +24,8 @@ async fn main() -> anyhow::Result<()> {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
                 let registry = AppRegistry::new(line_token, ctx.clone());
-                registry.load_data().await.ok();
+                let ret = registry.load_data().await;
+                println!("Load data result: {:?}", ret);
 
                 let app = routes().with_state(registry.clone());
 
