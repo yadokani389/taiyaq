@@ -3,25 +3,29 @@ use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
 use chrono::Utc;
+use poise::serenity_prelude::Context;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
 use crate::api::model::{AddNotificationRequest, OrderDetailsResponse};
-use crate::data::{Data, Item, Notify, Order, OrderStatus};
+use crate::data::{Data, Item, Notify, NotifyChannel, Order, OrderStatus};
+use crate::discord;
 
 // AppRegistry is the main application state.
 #[derive(Clone)]
 pub struct AppRegistry {
     data: Arc<RwLock<Data>>,
     pub line: Arc<Mutex<LINE>>,
+    pub discord_ctx: Arc<Mutex<Context>>,
 }
 
 impl AppRegistry {
     const FILE_PATH: &str = "data.json";
 
-    pub fn new(line_token: String) -> Self {
+    pub fn new(line_token: String, ctx: Context) -> Self {
         Self {
             data: Arc::new(RwLock::new(Data::default())),
             line: Arc::new(Mutex::new(LINE::new(line_token))),
+            discord_ctx: Arc::new(Mutex::new(ctx)),
         }
     }
 
@@ -53,7 +57,7 @@ impl AppRegistry {
             ordered_at: Utc::now(),
             ready_at: None,
             completed_at: None,
-            notify: None,
+            notify: vec![],
         };
         data.orders.push(new_order.clone());
         drop(data);
@@ -82,7 +86,7 @@ impl AppRegistry {
                 order.status = OrderStatus::Ready;
                 order.ready_at = Some(Utc::now());
                 newly_ready_orders.push(order.id);
-                if let Some(notify) = &order.notify {
+                for notify in &order.notify {
                     self.send_notification(
                         order.id,
                         notify,
@@ -167,7 +171,7 @@ impl AppRegistry {
     ) -> Option<Order> {
         let mut data = self.data.write().await;
         let order = data.orders.iter_mut().find(|o| o.id == id)?;
-        order.notify = Some(Notify {
+        order.notify.push(Notify {
             channel: payload.channel,
             target: payload.target,
         });
@@ -183,6 +187,18 @@ impl AppRegistry {
             "Sending notification for Order ID: {}, Channel: {:?}, Target: {}, Message: {}",
             order_id, notify.channel, notify.target, message
         );
+
+        match notify.channel {
+            NotifyChannel::Discord => {
+                let ctx = self.discord_ctx.lock().await;
+                let user_id: u64 = notify.target.parse().unwrap_or(0);
+                if user_id != 0 {
+                    discord::send_dm(&ctx, user_id, &message).await.ok();
+                }
+            }
+            NotifyChannel::Email => todo!(),
+            NotifyChannel::Line => todo!(),
+        }
     }
 
     pub async fn get_order_details(&self, id: u32) -> Option<OrderDetailsResponse> {
