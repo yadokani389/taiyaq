@@ -19,7 +19,7 @@ pub struct Order {
     pub ordered_at: DateTime<Utc>,
     pub ready_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
-    pub notify: Option<Notify>,
+    pub notify: Vec<Notify>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

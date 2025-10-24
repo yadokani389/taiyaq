@@ -36,6 +36,7 @@ pub async fn create_order(
     State(registry): State<AppRegistry>,
     Json(payload): Json<CreateOrderRequest>,
 ) -> (StatusCode, Json<Order>) {
+    println!("Creating order with items: {:?}", payload.items);
     let new_order = registry.create_order(payload.items).await;
     (StatusCode::CREATED, Json(new_order))
 }
