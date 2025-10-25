@@ -2,7 +2,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use bot_sdk_line::{
     messaging_api_line::{
         apis::MessagingApiApi,
-        models::{Message, ReplyMessageRequest, TextMessageV2},
+        models::{buttons_template, ButtonsTemplate, Message, MessageAction, PostbackAction, ReplyMessageRequest, Template, TemplateMessage, TextMessageV2, UriAction},
     },
     webhook_line::models::{CallbackRequest, Event, MessageContent},
 };
@@ -85,10 +85,43 @@ pub async fn line_callback(
                     reply_text = "Usage: status <order_id>".to_string();
                 }
             } else {
-                reply_text = format!(
-                    "You said: {}. Try 'notify <order_id> <target>' or 'status <order_id>'.",
-                    user_message
-                );
+                // ボタンで返す例
+                let buttons = ButtonsTemplate {
+                    r#type: Some("buttons".to_string()),
+                    thumbnail_image_url: None,
+                    image_aspect_ratio: None,
+                    image_size: None,
+                    image_background_color: None,
+                    title: Some("操作を選択".to_string()),
+                    text: "以下から選んでください：".to_string(),
+                    actions: vec![],
+                    default_action: None,
+                };
+                
+                let template_message = TemplateMessage {
+                    r#type: Some("template".to_string()),
+                    quick_reply: None,
+                    sender: None,
+                    alt_text: "メニュー".to_string(),
+                    template: Box::new(Template::ButtonsTemplate(buttons)),
+                };
+
+                let reply_message_request = ReplyMessageRequest {
+                    reply_token: reply_token,
+                    messages: vec![Message::TemplateMessage(template_message)],
+                    notification_disabled: Some(false),
+                };
+
+                let result = registry
+                    .line
+                    .lock()
+                    .await
+                    .messaging_api_client
+                    .reply_message(reply_message_request)
+                    .await;
+                println!("{:#?}", result);
+                // 次のループへ（既に返信したので以降のテキスト返信処理は行わない）
+                continue;
             }
 
             let reply_message_request = ReplyMessageRequest {
