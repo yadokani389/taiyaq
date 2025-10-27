@@ -2,14 +2,7 @@
 edition = "2024"
 name = "taiyaq-backend"
 version = "0.1.0"
-
-[lib]
-name = "taiyaq_backend"
-path = "src/main.rs"
-
-[[bin]]
-name = "setup_richmenu"
-path = "src/bin/setup_richmenu.rs"
+default-run = "taiyaq-backend"
 
 [dependencies]
 anyhow = "1.0.100"

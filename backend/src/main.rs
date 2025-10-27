@@ -12,7 +12,6 @@ mod data;
 pub mod discord;
 pub mod line;
 
-#[allow(dead_code)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();

@@ -273,28 +273,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let channel_access_token =
         std::env::var("LINE_CHANNEL_ACCESS_TOKEN").expect("LINE_CHANNEL_ACCESS_TOKEN not set");
 
-    println!("🚀 Setting up Rich Menu...\n");
+    println!("Setting up Rich Menu...\n");
 
     // 1. 既存のリッチメニューを削除
-    println!("🗑️  Cleaning up old rich menus...");
+    println!("Cleaning up old rich menus...");
     let existing_menus = list_rich_menus(&channel_access_token).await?;
     for menu_id in existing_menus {
         delete_rich_menu(&channel_access_token, &menu_id).await?;
     }
 
     // 2. 新しいリッチメニューを作成
-    println!("\n📝 Creating new rich menu...");
+    println!("\nCreating new rich menu...");
     let rich_menu_id = create_simple_rich_menu(&channel_access_token).await?;
 
     // 3. 画像をアップロード（2500x1686pxのPNG画像を用意してください）
-    println!("\n🖼️  Uploading rich menu image...");
+    println!("\nUploading rich menu image...");
     upload_rich_menu_image(&channel_access_token, &rich_menu_id, "assets/richmenu.png").await?;
 
     // 4. デフォルトに設定
-    println!("\n⚙️  Setting as default rich menu...");
+    println!("\nSetting as default rich menu...");
     set_default_rich_menu(&channel_access_token, &rich_menu_id).await?;
 
-    println!("\n✨ Rich Menu setup complete!");
+    println!("\nRich Menu setup complete!");
     println!("Rich Menu ID: {}", rich_menu_id);
 
     Ok(())

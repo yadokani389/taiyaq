@@ -73,9 +73,8 @@ pub async fn handle_postback(
 
     let reply_text = match postback_data {
         "action=register_notification" => {
-            // 通知登録ボタンが押された場合（リッチメニューから）
-            // fill_in_text で入力欄に自動入力されるので、ここでは何もしない
-            return;
+            "注文番号を半角数字で続いて入力↓\n例:\"!adding_notification: 123\""
+                .to_string()
         }
         "action=show_access" => {
             "📍アクセス\n校内マップ: https://example.com/map\n※実際のURLに置き換えてください"
@@ -89,11 +88,10 @@ pub async fn handle_postback(
             "📖 HELP\n\n【よくある質問】\n\nQ. グループへの参加ができない\nA. グループへの参加は許可されていません。\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。"
                 .to_string()
         }
-        "notification_register" => {
-            // 確認ボタンからの通知登録
-            "注文番号を半角数字で続いて入力↓\n例:\"!adding_notification: 123\"".to_string()
+        "notification_cancel" => {
+            "キャンセルされました"
+                .to_string()
         }
-        "notification_cancel" => "キャンセルされました".to_string(),
         _ => format!("不明な操作です: {}", postback_data),
     };
 
@@ -164,7 +162,7 @@ async fn handle_adding_notification(
                 actions: vec![
                     Action::PostbackAction(PostbackAction {
                         r#type: None,
-                        label: Some("はい、登録する".to_string()),
+                        label: Some("はい".to_string()),
                         data: Some(format!("notify_confirm_{}", order_id)),
                         display_text: Some("通知を登録しました".to_string()),
                         text: None,
