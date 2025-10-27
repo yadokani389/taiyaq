@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{Json, extract::State, http::StatusCode};
 use bot_sdk_line::webhook_line::models::CallbackRequest;
 
 use crate::app::AppRegistry;

@@ -1,69 +1,189 @@
-use bot_sdk_line::{
-    messaging_api_line::{
-        apis::MessagingApiApi,
-        models::{
-            postback_action::InputOption, template::Template, Action, ConfirmTemplate, Message,
-            PostbackAction, ReplyMessageRequest, TemplateMessage, TextMessageV2,
-        },
+use bot_sdk_line::messaging_api_line::{
+    apis::MessagingApiApi,
+    models::{
+        template::Template, Action, ConfirmTemplate, Message,
+        PostbackAction, ReplyMessageRequest, TemplateMessage, TextMessageV2,
     },
 };
 
-use crate::app::AppRegistry;
+use crate::{
+    api::model::AddNotificationRequest,
+    app::AppRegistry,
+    data::{NotifyChannel, OrderStatus},
+};
 
 /// コマンドを処理
-pub async fn handle_command(registry: &AppRegistry, reply_token: String, command: &str) {
-    match command {
-        "!notification" => {
-            show_notification_button(registry, reply_token).await;
-        }
-        "!access" => {
-            let reply_text = "📍アクセス\n校内マップ: https://example.com/map\n※実際のURLに置き換えてください".to_string();
-            send_text_reply(registry, reply_token, reply_text).await;
-        }
-        "!menu" => {
-            let reply_text = "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- いも（あんこ） (200円)".to_string();
-            send_text_reply(registry, reply_token, reply_text).await;
-        }
-        "!help" => {
-            let reply_text = "📖 HELP\n\n【よくある質問】\n\nQ. グループへの参加ができない\nA. グループへの参加は許可されていません。\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【コマンド一覧】\n!menu - メニューを表示\n!access - アクセス情報を表示\n!notification - 通知登録\n!help - このヘルプを表示".to_string();
-            send_text_reply(registry, reply_token, reply_text).await;
-        }
-        cmd if cmd.starts_with("!adding_notification:") => {
-            handle_adding_notification(registry, reply_token, cmd).await;
-        }
-        _ => {
-            let reply_text = "不明なコマンドです。\n「!help」でコマンド一覧を確認できます。".to_string();
-            send_text_reply(registry, reply_token, reply_text).await;
-        }
+pub async fn handle_command(
+    registry: &AppRegistry,
+    reply_token: String,
+    command: &str,
+    user_id: Option<String>,
+) {
+    if let Some(order_id_str) = command.strip_prefix("!adding_notification:") {
+        handle_adding_notification(registry, reply_token, order_id_str.trim(), user_id).await;
+    } else {
+        let reply_text = "不明なコマンドです。\nリッチメニューから操作してください。".to_string();
+        send_text_reply(registry, reply_token, reply_text).await;
     }
 }
 
 /// Postbackイベントを処理
-pub async fn handle_postback(registry: &AppRegistry, reply_token: String, postback_data: &str) {
+pub async fn handle_postback(
+    registry: &AppRegistry,
+    reply_token: String,
+    postback_data: &str,
+    user_id: Option<String>,
+) {
+    // 通知登録の確認ボタンからのPostback
+    if let Some(order_id_str) = postback_data.strip_prefix("notify_confirm_") {
+        if let Ok(order_id) = order_id_str.parse::<u32>() {
+            // user_id が取得できない場合はエラー
+            let Some(user_id) = user_id else {
+                let reply_text = "❌ ユーザー情報の取得に失敗しました。".to_string();
+                send_text_reply(registry, reply_token, reply_text).await;
+                return;
+            };
+
+            // 通知登録処理
+            let payload = AddNotificationRequest {
+                channel: NotifyChannel::Line,
+                target: user_id,
+            };
+
+            if registry.add_notification(order_id, payload).await.is_some() {
+                let reply_text = format!(
+                    "✅ 注文 #{} の通知を登録しました！\n準備ができたらメッセージをお送りします。",
+                    order_id
+                );
+                send_text_reply(registry, reply_token, reply_text).await;
+            } else {
+                let reply_text = "❌ エラー：通知の登録に失敗しました。".to_string();
+                send_text_reply(registry, reply_token, reply_text).await;
+            }
+            return;
+        }
+    }
+
+    // 通知登録のキャンセルボタンからのPostback
+    if postback_data.starts_with("notify_cancel_") {
+        let reply_text = "通知の登録をキャンセルしました。".to_string();
+        send_text_reply(registry, reply_token, reply_text).await;
+        return;
+    }
+
     let reply_text = match postback_data {
+        "action=register_notification" => {
+            // 通知登録ボタンが押された場合（リッチメニューから）
+            // fill_in_text で入力欄に自動入力されるので、ここでは何もしない
+            return;
+        }
+        "action=show_access" => {
+            "📍アクセス\n校内マップ: https://example.com/map\n※実際のURLに置き換えてください"
+                .to_string()
+        }
+        "action=show_menu" => {
+            "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- いも（あんこ） (200円)"
+                .to_string()
+        }
+        "action=show_help" => {
+            "📖 HELP\n\n【よくある質問】\n\nQ. グループへの参加ができない\nA. グループへの参加は許可されていません。\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。"
+                .to_string()
+        }
         "notification_register" => {
+            // 確認ボタンからの通知登録
             "注文番号を半角数字で続いて入力↓\n例:\"!adding_notification: 123\"".to_string()
         }
         "notification_cancel" => "キャンセルされました".to_string(),
-        _ => "不明な操作です".to_string(),
+        _ => format!("不明な操作です: {}", postback_data),
     };
 
     send_text_reply(registry, reply_token, reply_text).await;
 }
 
 /// 通知追加コマンドを処理
-async fn handle_adding_notification(registry: &AppRegistry, reply_token: String, command: &str) {
-    let order_id_str = command
-        .strip_prefix("!adding_notification:")
-        .unwrap_or("")
-        .trim();
-
+async fn handle_adding_notification(
+    registry: &AppRegistry,
+    reply_token: String,
+    order_id_str: &str,
+    user_id: Option<String>,
+) {
     match order_id_str.parse::<u32>() {
         Ok(order_id) => {
-            // TODO: 実際の通知登録処理を実装
-            // registry.add_notification(order_id, ...).await;
-            let reply_text = format!("✅ 注文ID {} の通知を登録しました！\n完了時にメッセージをお送りします。", order_id);
-            send_text_reply(registry, reply_token, reply_text).await;
+            // user_id が取得できない場合はエラー
+            if user_id.is_none() {
+                let reply_text = "❌ ユーザー情報の取得に失敗しました。".to_string();
+                send_text_reply(registry, reply_token, reply_text).await;
+                return;
+            }
+
+            // 注文情報を取得
+            let data = registry.data().await;
+            let order = data.orders.iter().find(|o| o.id == order_id);
+
+            if order.is_none() {
+                let reply_text = format!("❌ 注文 {} が見つかりません。", order_id);
+                send_text_reply(registry, reply_token, reply_text).await;
+                return;
+            }
+
+            let order = order.unwrap().clone();
+            drop(data);
+
+            // 注文がすでに完了/キャンセルされている場合
+            if order.status == OrderStatus::Completed || order.status == OrderStatus::Cancelled {
+                let reply_text = format!(
+                    "❌ 注文 {} はすでに完了/キャンセルされています。",
+                    order_id
+                );
+                send_text_reply(registry, reply_token, reply_text).await;
+                return;
+            }
+
+            // 注文内容を整形
+            let items_str = order
+                .items
+                .iter()
+                .map(|item| format!("・{} x{}", item.flavor, item.quantity))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            let ordered_at_str = order
+                .ordered_at
+                .format("%Y年%m月%d日 %H:%M:%S")
+                .to_string();
+
+            // 確認メッセージを作成
+            let confirm_text = format!(
+                "📝 注文 #{} の通知設定\n\n以下の注文で通知を登録しますか？\n\n【商品】\n{}\n\n【注文時刻】\n{}",
+                order.id, items_str, ordered_at_str
+            );
+
+            let confirms = ConfirmTemplate {
+                r#type: None,
+                text: confirm_text,
+                actions: vec![
+                    Action::PostbackAction(PostbackAction {
+                        r#type: None,
+                        label: Some("はい、登録する".to_string()),
+                        data: Some(format!("notify_confirm_{}", order_id)),
+                        display_text: Some("通知を登録しました".to_string()),
+                        text: None,
+                        input_option: None,
+                        fill_in_text: None,
+                    }),
+                    Action::PostbackAction(PostbackAction {
+                        r#type: None,
+                        label: Some("いいえ".to_string()),
+                        data: Some(format!("notify_cancel_{}", order_id)),
+                        display_text: Some("キャンセルしました".to_string()),
+                        text: None,
+                        input_option: None,
+                        fill_in_text: None,
+                    }),
+                ],
+            };
+
+            send_template_reply(registry, reply_token, confirms, "通知登録の確認").await;
         }
         Err(_) => {
             let reply_text =
@@ -72,36 +192,6 @@ async fn handle_adding_notification(registry: &AppRegistry, reply_token: String,
             send_text_reply(registry, reply_token, reply_text).await;
         }
     }
-}
-
-/// 通知登録用のボタンテンプレートを表示
-async fn show_notification_button(registry: &AppRegistry, reply_token: String) {
-    let confirms = ConfirmTemplate {
-        r#type: None,
-        text: "通知登録を行いますか？\n注文番号を続けて入力してください。".to_string(),
-        actions: vec![
-            Action::PostbackAction(PostbackAction {
-                r#type: None,
-                label: Some("通知登録".to_string()),
-                data: Some("notification_register".to_string()),
-                display_text: None,
-                text: None,
-                input_option: Some(InputOption::OpenKeyboard),
-                fill_in_text: Some("!adding_notification: ".to_string()),
-            }),
-            Action::PostbackAction(PostbackAction {
-                r#type: None,
-                label: Some("キャンセル".to_string()),
-                data: Some("notification_cancel".to_string()),
-                display_text: Some("キャンセルしました".to_string()),
-                text: None,
-                input_option: None,
-                fill_in_text: None,
-            }),
-        ],
-    };
-
-    send_template_reply(registry, reply_token, confirms, "通知登録").await;
 }
 
 /// テンプレートメッセージを返信（汎用）

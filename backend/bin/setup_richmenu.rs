@@ -1,3 +1,6 @@
+// リッチメニューを上書きします。
+// cargo run --bin setup_richmenu
+
 use dotenvy::dotenv;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -94,7 +97,7 @@ async fn create_simple_rich_menu(
                 },
                 action: Action::Postback {
                     data: "action=show_access".to_string(),
-                    display_text: Some("アクセス情報を表示".to_string()),
+                    display_text: None,
                     input_option: None,
                     fill_in_text: None,
                 },
@@ -109,7 +112,7 @@ async fn create_simple_rich_menu(
                 },
                 action: Action::Postback {
                     data: "action=show_menu".to_string(),
-                    display_text: Some("メニューを表示".to_string()),
+                    display_text: None,
                     input_option: None,
                     fill_in_text: None,
                 },
@@ -124,7 +127,7 @@ async fn create_simple_rich_menu(
                 },
                 action: Action::Postback {
                     data: "action=show_help".to_string(),
-                    display_text: Some("ヘルプを表示".to_string()),
+                    display_text: None,
                     input_option: None,
                     fill_in_text: None,
                 },
@@ -267,8 +270,8 @@ async fn set_default_rich_menu(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    let channel_access_token = std::env::var("LINE_CHANNEL_ACCESS_TOKEN")
-        .expect("LINE_CHANNEL_ACCESS_TOKEN not set");
+    let channel_access_token =
+        std::env::var("LINE_CHANNEL_ACCESS_TOKEN").expect("LINE_CHANNEL_ACCESS_TOKEN not set");
 
     println!("🚀 Setting up Rich Menu...\n");
 
