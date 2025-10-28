@@ -10,16 +10,12 @@ pub async fn line_handler(registry: &AppRegistry, req: CallbackRequest) -> Resul
             // テキストメッセージの処理
             Event::MessageEvent(message_event) => {
                 if let MessageContent::TextMessageContent(text_message) = *message_event.message {
-                    let reply_token = message_event
-                        .reply_token
-                        .ok_or(StatusCode::BAD_REQUEST)?;
-                    let user_id = message_event
-                        .source
-                        .and_then(|source| match *source {
-                            Source::UserSource(user_source) => user_source.user_id,
-                            Source::GroupSource(group_source) => Some(group_source.group_id),
-                            Source::RoomSource(room_source) => Some(room_source.room_id),
-                        });
+                    let reply_token = message_event.reply_token.ok_or(StatusCode::BAD_REQUEST)?;
+                    let user_id = message_event.source.and_then(|source| match *source {
+                        Source::UserSource(user_source) => user_source.user_id,
+                        Source::GroupSource(group_source) => Some(group_source.group_id),
+                        Source::RoomSource(room_source) => Some(room_source.room_id),
+                    });
                     let user_message = text_message.text.trim();
 
                     // コマンド判定（先頭が「!」かどうか）
@@ -34,16 +30,12 @@ pub async fn line_handler(registry: &AppRegistry, req: CallbackRequest) -> Resul
             }
             // Postbackイベントの処理
             Event::PostbackEvent(postback_event) => {
-                let reply_token = postback_event
-                    .reply_token
-                    .ok_or(StatusCode::BAD_REQUEST)?;
-                let user_id = postback_event
-                        .source
-                        .and_then(|source| match *source {
-                            Source::UserSource(user_source) => user_source.user_id,
-                            Source::GroupSource(group_source) => Some(group_source.group_id),
-                            Source::RoomSource(room_source) => Some(room_source.room_id),
-                        });
+                let reply_token = postback_event.reply_token.ok_or(StatusCode::BAD_REQUEST)?;
+                let user_id = postback_event.source.and_then(|source| match *source {
+                    Source::UserSource(user_source) => user_source.user_id,
+                    Source::GroupSource(group_source) => Some(group_source.group_id),
+                    Source::RoomSource(room_source) => Some(room_source.room_id),
+                });
                 let postback_data = postback_event.postback.data.as_str();
 
                 commands::handle_postback(registry, reply_token, postback_data, user_id).await;

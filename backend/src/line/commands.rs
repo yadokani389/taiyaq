@@ -1,11 +1,11 @@
-use dotenvy::dotenv;
 use bot_sdk_line::messaging_api_line::{
     apis::MessagingApiApi,
     models::{
-        template::Template, Action, ConfirmTemplate, Message,
-        PostbackAction, ReplyMessageRequest, TemplateMessage, TextMessageV2,
+        Action, ConfirmTemplate, Message, PostbackAction, ReplyMessageRequest, TemplateMessage,
+        TextMessageV2, template::Template,
     },
 };
+use dotenvy::dotenv;
 
 use crate::{
     api::model::AddNotificationRequest,
@@ -133,10 +133,8 @@ async fn handle_adding_notification(
 
             // 注文がすでに完了/キャンセルされている場合
             if order.status == OrderStatus::Completed || order.status == OrderStatus::Cancelled {
-                let reply_text = format!(
-                    "❌ 注文 {} はすでに完了/キャンセルされています。",
-                    order_id
-                );
+                let reply_text =
+                    format!("❌ 注文 {} はすでに完了/キャンセルされています。", order_id);
                 send_text_reply(registry, reply_token, reply_text).await;
                 return;
             }
@@ -149,10 +147,7 @@ async fn handle_adding_notification(
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            let ordered_at_str = order
-                .ordered_at
-                .format("%Y年%m月%d日 %H:%M:%S")
-                .to_string();
+            let ordered_at_str = order.ordered_at.format("%Y年%m月%d日 %H:%M:%S").to_string();
 
             // 確認メッセージを作成
             let confirm_text = format!(
