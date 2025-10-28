@@ -179,23 +179,23 @@ async fn notify(
     match interaction {
         Some(press) => {
             press.defer(ctx).await?;
-            if press.data.custom_id == custom_id_confirm {
+            let (description, color) = if press.data.custom_id == custom_id_confirm {
                 let payload = AddNotificationRequest {
                     channel: NotifyChannel::Discord,
                     target: ctx.author().id.to_string(),
                 };
                 if registry.add_notification(id, payload).await.is_some() {
-                    edited_embed = edited_embed
-                        .description("通知を登録しました。準備ができたらDMでお知らせします。")
-                        .color(Colour::DARK_GREEN);
+                    (
+                        "通知を登録しました。準備ができたらDMでお知らせします。",
+                        Colour::DARK_GREEN,
+                    )
                 } else {
-                    edited_embed = edited_embed
-                        .description("エラー：通知の登録に失敗しました。")
-                        .color(Colour::RED);
+                    ("エラー：通知の登録に失敗しました。", Colour::RED)
                 }
             } else {
-                edited_embed = edited_embed.description("通知の登録をキャンセルしました。");
-            }
+                ("通知の登録をキャンセルしました。", Colour::default())
+            };
+            edited_embed = edited_embed.description(description).color(color);
         }
         None => {
             edited_embed = edited_embed

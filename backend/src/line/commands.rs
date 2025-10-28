@@ -36,33 +36,33 @@ pub async fn handle_postback(
     user_id: Option<String>,
 ) {
     // 通知登録の確認ボタンからのPostback
-    if let Some(order_id_str) = postback_data.strip_prefix("notify_confirm_") {
-        if let Ok(order_id) = order_id_str.parse::<u32>() {
-            // user_id が取得できない場合はエラー
-            let Some(user_id) = user_id else {
-                let reply_text = "❌ ユーザー情報の取得に失敗しました。".to_string();
-                send_text_reply(registry, reply_token, reply_text).await;
-                return;
-            };
-
-            // 通知登録処理
-            let payload = AddNotificationRequest {
-                channel: NotifyChannel::Line,
-                target: user_id,
-            };
-
-            if registry.add_notification(order_id, payload).await.is_some() {
-                let reply_text = format!(
-                    "✅ 注文 #{} の通知を登録しました！\n準備ができたらメッセージをお送りします。",
-                    order_id
-                );
-                send_text_reply(registry, reply_token, reply_text).await;
-            } else {
-                let reply_text = "❌ エラー：通知の登録に失敗しました。".to_string();
-                send_text_reply(registry, reply_token, reply_text).await;
-            }
+    if let Some(order_id_str) = postback_data.strip_prefix("notify_confirm_")
+        && let Ok(order_id) = order_id_str.parse::<u32>()
+    {
+        // user_id が取得できない場合はエラー
+        let Some(user_id) = user_id else {
+            let reply_text = "❌ ユーザー情報の取得に失敗しました。".to_string();
+            send_text_reply(registry, reply_token, reply_text).await;
             return;
+        };
+
+        // 通知登録処理
+        let payload = AddNotificationRequest {
+            channel: NotifyChannel::Line,
+            target: user_id,
+        };
+
+        if registry.add_notification(order_id, payload).await.is_some() {
+            let reply_text = format!(
+                "✅ 注文 #{} の通知を登録しました！\n準備ができたらメッセージをお送りします。",
+                order_id
+            );
+            send_text_reply(registry, reply_token, reply_text).await;
+        } else {
+            let reply_text = "❌ エラー：通知の登録に失敗しました。".to_string();
+            send_text_reply(registry, reply_token, reply_text).await;
         }
+        return;
     }
 
     // 通知登録のキャンセルボタンからのPostback
@@ -116,19 +116,15 @@ async fn handle_adding_notification(
                 let reply_text = "❌ ユーザー情報の取得に失敗しました。".to_string();
                 send_text_reply(registry, reply_token, reply_text).await;
                 return;
-            }
+            };
 
             // 注文情報を取得
             let data = registry.data().await;
-            let order = data.orders.iter().find(|o| o.id == order_id);
-
-            if order.is_none() {
+            let Some(order) = data.orders.iter().find(|o| o.id == order_id).cloned() else {
                 let reply_text = format!("❌ 注文 {} が見つかりません。", order_id);
                 send_text_reply(registry, reply_token, reply_text).await;
                 return;
-            }
-
-            let order = order.unwrap().clone();
+            };
             drop(data);
 
             // 注文がすでに完了/キャンセルされている場合
