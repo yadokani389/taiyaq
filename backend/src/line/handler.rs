@@ -27,7 +27,7 @@ pub async fn line_handler(registry: &AppRegistry, req: CallbackRequest) -> Resul
                         commands::handle_command(registry, reply_token, user_message, user_id)
                             .await;
                     } else {
-                        let reply_text = "あつあつのうちに取りに来てね！🔥".to_string();
+                        let reply_text = "たいやきくんはダンスが上手！".to_string();
                         commands::send_text_reply(registry, reply_token, reply_text).await;
                     }
                 }

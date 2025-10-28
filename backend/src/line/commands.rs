@@ -1,3 +1,4 @@
+use dotenvy::dotenv;
 use bot_sdk_line::messaging_api_line::{
     apis::MessagingApiApi,
     models::{
@@ -77,15 +78,18 @@ pub async fn handle_postback(
                 .to_string()
         }
         "action=show_access" => {
-            "📍アクセス\n校内マップ: https://example.com/map\n※実際のURLに置き換えてください"
-                .to_string()
+            dotenv().ok();
+            let file_id = std::env::var("ACCESS_PDF_ID")
+                .unwrap_or_else(|_| "1p0pllxIOw3fJYPGr1ymBT7p8G8KybxYO".to_string());
+            let pdf_url = format!("https://drive.google.com/file/d/{}/preview", file_id);
+            format!("📍アクセス\n校内マップはこちら↓\n{}", pdf_url)
         }
         "action=show_menu" => {
-            "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- いも（あんこ） (200円)"
+            "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- 栗きんとん (200円)"
                 .to_string()
         }
         "action=show_help" => {
-            "📖 HELP\n\n【よくある質問】\n\nQ. グループへの参加ができない\nA. グループへの参加は許可されていません。\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。"
+            "📖 HELP\n\n【よくある質問】\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。"
                 .to_string()
         }
         "notification_cancel" => {
