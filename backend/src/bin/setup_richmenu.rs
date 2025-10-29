@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .delete_rich_menu(&menu_id)
             .await
             .map_err(|e| format!("Failed to delete rich menu {}: {:?}", menu_id, e))?;
-        println!("✅ Deleted Rich Menu: {}", menu_id);
+        println!("Deleted Rich Menu: {}", menu_id);
     }
 
     // 2. 新しいリッチメニューを作成
@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let rich_menu_id = response.rich_menu_id;
 
-    println!("✅ Created Rich Menu ID: {}", rich_menu_id);
+    println!("Created Rich Menu ID: {}", rich_menu_id);
 
     // 3. 画像をアップロード（2500x1686pxのPNG画像を用意してください）
     println!("\nUploading rich menu image...");
@@ -162,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .map_err(|e| format!("Failed to upload rich menu image: {:?}", e))?;
 
-    println!("✅ Uploaded image for Rich Menu: {}", rich_menu_id);
+    println!("Uploaded image for Rich Menu: {}", rich_menu_id);
 
     // 4. デフォルトに設定
     println!("\nSetting as default rich menu...");
@@ -171,9 +171,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .map_err(|e| format!("Failed to set default rich menu: {:?}", e))?;
 
-    println!("✅ Set default Rich Menu: {}", rich_menu_id);
+    println!("Set default Rich Menu: {}", rich_menu_id);
 
-    println!("\n✨ Rich Menu setup complete!");
+    println!("\nRich Menu setup complete!");
     println!("Rich Menu ID: {}", rich_menu_id);
 
     Ok(())
