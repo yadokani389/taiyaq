@@ -10,7 +10,7 @@ use crate::{
         UpdateProductionResponse,
     },
     app::AppRegistry,
-    data::Order,
+    data::{Flavor, FlavorConfig, Order},
 };
 
 /// GET /api/staff/orders
@@ -88,4 +88,14 @@ pub async fn add_notification(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+/// PUT /api/staff/flavors/{flavor}
+pub async fn set_flavor_config(
+    State(registry): State<AppRegistry>,
+    Path(flavor): Path<Flavor>,
+    Json(config): Json<FlavorConfig>,
+) -> StatusCode {
+    registry.set_flavor_config(flavor, config).await;
+    StatusCode::OK
 }

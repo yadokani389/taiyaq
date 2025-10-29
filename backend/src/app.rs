@@ -11,7 +11,7 @@ use poise::serenity_prelude::Context;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
 use crate::api::model::{AddNotificationRequest, OrderDetailsResponse};
-use crate::data::{Data, Item, Notify, NotifyChannel, Order, OrderStatus};
+use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, NotifyChannel, Order, OrderStatus};
 use crate::discord;
 
 // AppRegistry is the main application state.
@@ -118,7 +118,7 @@ impl AppRegistry {
     }
 
     // Helper to check if an order can be fulfilled from stock
-    fn can_fulfill(order: &Order, stock: &HashMap<String, usize>) -> bool {
+    fn can_fulfill(order: &Order, stock: &HashMap<Flavor, usize>) -> bool {
         order
             .items
             .iter()
@@ -126,7 +126,7 @@ impl AppRegistry {
     }
 
     // Helper to decrement stock for a fulfilled order
-    fn fulfill(order: &Order, stock: &mut HashMap<String, usize>) {
+    fn fulfill(order: &Order, stock: &mut HashMap<Flavor, usize>) {
         for item in &order.items {
             if let Some(stock_qty) = stock.get_mut(&item.flavor) {
                 *stock_qty -= item.quantity;
@@ -151,13 +151,14 @@ impl AppRegistry {
         let Data {
             ref mut orders,
             ref mut unallocated_stock,
+            ..
         } = *data;
         let order = orders.iter_mut().find(|o| o.id == id)?;
         // If the order was already ready, its items were deducted from unallocated_stock.
         // When cancelled, these items should be returned to unallocated_stock.
         if order.status == OrderStatus::Ready {
             for item in &order.items {
-                *unallocated_stock.entry(item.flavor.clone()).or_insert(0) += item.quantity;
+                *unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
             }
         }
         order.status = OrderStatus::Cancelled;
@@ -237,26 +238,80 @@ impl AppRegistry {
     }
 
     pub async fn get_order_details(&self, id: u32) -> Option<OrderDetailsResponse> {
-        let data_guard = self.data.read().await;
-        let orders = &data_guard.orders;
-        if let Some(order) = orders.iter().find(|o| o.id == id) {
-            let estimated_wait_minutes = if order.status == OrderStatus::Waiting {
-                // Simplified estimation logic: 5 minutes per waiting order ahead of this one.
-                let position = orders
+        let data = self.data.read().await;
+        let order = data.orders.iter().find(|o| o.id == id)?;
+
+        let estimated_wait_minutes = if order.status == OrderStatus::Waiting {
+            let mut max_wait_time: i64 = 0;
+
+            // For each item type in the order we are querying for...
+            for item_in_order in &order.items {
+                let flavor_to_calc = item_in_order.flavor;
+
+                // 1. Calculate total demand for this flavor from all waiting orders placed
+                //    at or before the current order.
+                let total_demand_for_flavor = data
+                    .orders
                     .iter()
-                    .filter(|o| o.status == OrderStatus::Waiting && o.ordered_at < order.ordered_at)
-                    .count();
-                Some((position as i64 + 1) * 5)
-            } else {
-                None
-            };
-            Some(OrderDetailsResponse {
-                id: order.id,
-                status: order.status,
-                estimated_wait_minutes,
-            })
+                    .filter(|o| {
+                        o.status == OrderStatus::Waiting && o.ordered_at <= order.ordered_at
+                    })
+                    .flat_map(|o| &o.items)
+                    .filter(|item| item.flavor == flavor_to_calc)
+                    .map(|item| item.quantity)
+                    .sum::<usize>();
+
+                // 2. Subtract available stock.
+                let stock_for_flavor = data
+                    .unallocated_stock
+                    .get(&flavor_to_calc)
+                    .copied()
+                    .unwrap_or(0);
+                let needed_from_production =
+                    total_demand_for_flavor.saturating_sub(stock_for_flavor);
+
+                if needed_from_production == 0 {
+                    continue; // This flavor doesn't contribute to the wait time.
+                }
+
+                // 3. Calculate batches and time based on config.
+                let wait_time_for_flavor =
+                    if let Some(config) = data.flavor_configs.get(&flavor_to_calc) {
+                        if config.quantity_per_batch > 0 {
+                            let batches_needed =
+                                (needed_from_production + config.quantity_per_batch as usize - 1)
+                                    / config.quantity_per_batch as usize;
+                            batches_needed as i64 * config.cooking_time_minutes as i64
+                        } else {
+                            0 // Avoid division by zero, assume no wait time if batch size is 0.
+                        }
+                    } else {
+                        // Config not found. A real implementation should log this.
+                        0
+                    };
+
+                // 4. Update the max wait time for the order.
+                if wait_time_for_flavor > max_wait_time {
+                    max_wait_time = wait_time_for_flavor;
+                }
+            }
+
+            Some(max_wait_time)
         } else {
             None
-        }
+        };
+
+        Some(OrderDetailsResponse {
+            id: order.id,
+            status: order.status,
+            estimated_wait_minutes,
+        })
+    }
+
+    pub async fn set_flavor_config(&self, flavor: Flavor, config: FlavorConfig) {
+        let mut data = self.data.write().await;
+        data.flavor_configs.insert(flavor, config);
+        drop(data);
+        self.save_data().await.ok();
     }
 }

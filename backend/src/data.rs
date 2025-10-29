@@ -1,13 +1,40 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum Flavor {
+    Tsubuan,
+    Custard,
+    Kurikinton,
+}
+
+impl fmt::Display for Flavor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Flavor::Tsubuan => write!(f, "つぶあん"),
+            Flavor::Custard => write!(f, "カスタード"),
+            Flavor::Kurikinton => write!(f, "栗きんとん"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FlavorConfig {
+    pub cooking_time_minutes: u32,
+    pub quantity_per_batch: u32,
+}
 
 // Data holds the core business data.
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Data {
     pub orders: Vec<Order>,
-    pub unallocated_stock: HashMap<String, usize>,
+    pub unallocated_stock: HashMap<Flavor, usize>,
+    pub flavor_configs: HashMap<Flavor, FlavorConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,7 +51,7 @@ pub struct Order {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Item {
-    pub flavor: String,
+    pub flavor: Flavor,
     pub quantity: usize,
 }
 

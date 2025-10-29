@@ -11,7 +11,7 @@
     "id": "integer",            // 注文番号 (予約番号)
     "items": [
         {
-            "flavor": "string", // 味
+            "flavor": "'tsubuan' | 'custard' | 'kurikinton'", // 味 (Enumとして管理)
             "quantity": "integer" // 個数
         }
     ],
@@ -27,6 +27,25 @@
 ```
 
 ## 2. APIエンドポイント
+
+### 【スタッフ向けAPI】
+
+#### `PUT /api/staff/flavors/{flavor}`
+
+各味の調理時間と一度に焼ける数（バッチサイズ）を設定します。
+
+- **パスパラメータ:**
+  - `flavor`: `tsubuan` | `custard` | `kurikinton`
+- **リクエストボディ:**
+
+  ```json
+  {
+    "cookingTimeMinutes": 10,
+    "quantityPerBatch": 8
+  }
+  ```
+
+- **レスポンス:** `200 OK` と更新された設定オブジェクト
 
 ### 【ユーザー・店頭ディスプレイ向けAPI】
 
