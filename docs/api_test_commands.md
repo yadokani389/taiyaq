@@ -3,10 +3,12 @@
 このドキュメントは、`taiyaq`バックエンドAPIエンドポイントをテストするための`curl`コマンドを提供します。
 これらのコマンドを実行する前に、バックエンドサーバーが`http://127.0.0.1:38000`で実行されていることを確認してください。
 
-## ベースURL
+## ベースURLとトークン
 
 ```bash
 BASE_URL="http://127.0.0.1:38000"
+# .envファイルなどで設定したSTAFF_API_TOKENをここに設定してください
+STAFF_API_TOKEN="your_secret_token_here"
 ```
 
 ## 1. スタッフAPI: 注文の作成
@@ -21,6 +23,7 @@ BASE_URL="http://127.0.0.1:38000"
 # 注文1を作成 (IDは1になります)
 curl -X POST "${BASE_URL}/api/staff/orders" \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -d '{
           "items": [
             {"flavor": "anko", "quantity": 2},
@@ -31,15 +34,16 @@ curl -X POST "${BASE_URL}/api/staff/orders" \
 # 注文2を作成 (IDは2になります)
 curl -X POST "${BASE_URL}/api/staff/orders" \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -d '{
           "items": [
             {"flavor": "anko", "quantity": 3}
           ]
         }'
 
-# 注文3を作成 (IDは3になります)
 curl -X POST "${BASE_URL}/api/staff/orders" \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -d '{
           "items": [
             {"flavor": "custard", "quantity": 5}
@@ -54,7 +58,8 @@ curl -X POST "${BASE_URL}/api/staff/orders" \
 ### `GET /api/staff/orders`
 
 ```bash
-curl -X GET "${BASE_URL}/api/staff/orders"
+curl -X GET "${BASE_URL}/api/staff/orders" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}"
 ```
 
 ### `GET /api/staff/orders?status=waiting`
@@ -62,7 +67,8 @@ curl -X GET "${BASE_URL}/api/staff/orders"
 「waiting」ステータスの注文を取得します。
 
 ```bash
-curl -X GET "${BASE_URL}/api/staff/orders?status=waiting"
+curl -X GET "${BASE_URL}/api/staff/orders?status=waiting" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}"
 ```
 
 ## 3. スタッフAPI: 生産状況の更新
@@ -75,6 +81,7 @@ curl -X GET "${BASE_URL}/api/staff/orders?status=waiting"
 # 生産状況を報告: あんこ5個、カスタード2個
 curl -X POST "${BASE_URL}/api/staff/production" \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -d '{
           "items": [
             {"flavor": "anko", "quantity": 5},
@@ -119,10 +126,8 @@ curl -X GET "${BASE_URL}/api/orders/3"
 # 注文3にメール通知を追加
 curl -X PUT "${BASE_URL}/api/staff/orders/3/notification" \
      -H "Content-Type: application/json" \
-     -d '{
-          "channel": "email",
-          "target": "user3@example.com"
-        }'
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
+
 ```
 
 ## 7. スタッフAPI: 注文の完了
@@ -133,7 +138,8 @@ curl -X PUT "${BASE_URL}/api/staff/orders/3/notification" \
 
 ```bash
 # 注文1を完了
-curl -X POST "${BASE_URL}/api/staff/orders/1/complete"
+curl -X POST "${BASE_URL}/api/staff/orders/1/complete" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}"
 ```
 
 ## 8. スタッフAPI: 注文のキャンセル
@@ -144,5 +150,6 @@ curl -X POST "${BASE_URL}/api/staff/orders/1/complete"
 
 ```bash
 # 注文3をキャンセル
-curl -X POST "${BASE_URL}/api/staff/orders/3/cancel"
+curl -X POST "${BASE_URL}/api/staff/orders/3/cancel" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}"
 ```
