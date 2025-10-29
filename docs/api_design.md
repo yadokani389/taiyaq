@@ -71,6 +71,12 @@
 
 ### 【スタッフ向けAPI】
 
+**認証:**
+
+すべてのスタッフ向けAPIエンドポイントは、`Authorization: Bearer <TOKEN>` ヘッダーによる認証を必要とします。
+`<TOKEN>` はサーバーで設定されたAPIトークンです。
+正しいトークンが提供されない場合、APIは `401 Unauthorized` を返します。
+
 #### `GET /api/staff/orders`
 
 スタッフが管理画面で現在の注文一覧を確認するためのAPIです。

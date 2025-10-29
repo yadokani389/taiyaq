@@ -1,12 +1,15 @@
 use crate::{
-    api::handler::{
-        add_notification, cancel_order, complete_order, create_order, get_display_orders,
-        get_order_details, get_staff_orders, line_callback, update_production,
+    api::{
+        auth::staff_api_auth,
+        handler::{
+            add_notification, cancel_order, complete_order, create_order, get_display_orders,
+            get_order_details, get_staff_orders, line_callback, update_production,
+        },
     },
     app::AppRegistry,
 };
 use axum::{
-    Router,
+    Router, middleware,
     routing::{get, post, put},
 };
 
@@ -20,7 +23,8 @@ pub fn routes() -> Router<AppRegistry> {
         .route("/staff/production", post(update_production))
         .route("/staff/orders/{id}/complete", post(complete_order))
         .route("/staff/orders/{id}/cancel", post(cancel_order))
-        .route("/staff/orders/{id}/notification", put(add_notification));
+        .route("/staff/orders/{id}/notification", put(add_notification))
+        .layer(middleware::from_fn(staff_api_auth));
 
     let line_router = Router::new().route("/line_callback", post(line_callback));
 
