@@ -1,8 +1,8 @@
 use bot_sdk_line::messaging_api_line::{
     apis::MessagingApiApi,
     models::{
-        Action, ConfirmTemplate, Message, PostbackAction, ReplyMessageRequest, TemplateMessage,
-        TextMessageV2, template::Template,
+        Action, ConfirmTemplate, ImageMessage, Message, PostbackAction, ReplyMessageRequest,
+        TemplateMessage, TextMessageV2, template::Template,
     },
 };
 
@@ -71,28 +71,24 @@ pub async fn handle_postback(
         return;
     }
 
+    // アクセス画像は特別処理
+    if postback_data == "action=show_access" {
+        send_access_image_reply(registry, reply_token).await;
+        return;
+    }
+
     let reply_text = match postback_data {
         "action=register_notification" => {
-            "注文番号を半角数字で続いて入力↓\n例:\"!adding_notification: 123\""
-                .to_string()
-        }
-        "action=show_access" => {
-            let file_id = std::env::var("ACCESS_PDF_ID")
-                .unwrap_or_else(|_| "1p0pllxIOw3fJYPGr1ymBT7p8G8KybxYO".to_string());
-            let pdf_url = format!("https://drive.google.com/file/d/{}/preview", file_id);
-            format!("📍アクセス\n校内マップはこちら↓\n{}", pdf_url)
+            "注文番号を半角数字で続いて入力↓\n例:\"!adding_notification: 123\"".to_string()
         }
         "action=show_menu" => {
-            "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- 栗きんとん (200円)"
-                .to_string()
+            "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- 栗きんとん (200円)".to_string()
         }
         "action=show_help" => {
-            "📖 HELP\n\n【よくある質問】\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。"
-                .to_string()
+            "📖 HELP\n\n【よくある質問】\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。".to_string()
         }
         "notification_cancel" => {
-            "キャンセルされました"
-                .to_string()
+            "キャンセルされました".to_string()
         }
         _ => format!("不明な操作です: {}", postback_data),
     };
@@ -244,5 +240,38 @@ pub async fn send_text_reply(registry: &AppRegistry, reply_token: String, text: 
 
     if let Err(e) = result {
         eprintln!("Failed to send text reply: {:?}", e);
+    }
+}
+
+async fn send_access_image_reply(registry: &AppRegistry, reply_token: String) {
+    let image_url = std::env::var("ACCESS_IMAGE_URL").unwrap_or_else(|_| {
+        "https://raw.githubusercontent.com/yadokani389/taiyaq/line/backend/assets/access.png"
+            .to_string()
+    });
+
+    let image_message = ImageMessage {
+        r#type: None,
+        quick_reply: None,
+        sender: None,
+        original_content_url: image_url.clone(),
+        preview_image_url: image_url,
+    };
+
+    let reply_message_request = ReplyMessageRequest {
+        reply_token,
+        messages: vec![Message::ImageMessage(image_message)],
+        notification_disabled: Some(false),
+    };
+
+    let result = registry
+        .line
+        .lock()
+        .await
+        .messaging_api_client
+        .reply_message(reply_message_request)
+        .await;
+
+    if let Err(e) = result {
+        eprintln!("Failed to send access image reply: {:?}", e);
     }
 }
