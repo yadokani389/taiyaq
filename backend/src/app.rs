@@ -2,6 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
+use bot_sdk_line::messaging_api_line::{
+    apis::MessagingApiApi,
+    models::{Message, PushMessageRequest, TextMessageV2},
+};
 use chrono::Utc;
 use poise::serenity_prelude::Context;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
@@ -197,7 +201,38 @@ impl AppRegistry {
                 }
             }
             NotifyChannel::Email => todo!(),
-            NotifyChannel::Line => todo!(),
+            NotifyChannel::Line => {
+                let line = self.line.lock().await;
+                let push_request = PushMessageRequest {
+                    to: notify.target.clone(), // LINE user_id
+                    messages: vec![Message::TextMessageV2(TextMessageV2 {
+                        r#type: None,
+                        quick_reply: None,
+                        sender: None,
+                        text: message.clone(),
+                        substitution: None,
+                        quote_token: None,
+                    })],
+                    notification_disabled: Some(false),
+                    custom_aggregation_units: None,
+                };
+
+                match line
+                    .messaging_api_client
+                    .push_message(push_request, None)
+                    .await
+                {
+                    Ok(_) => {
+                        println!("✅ LINE notification sent to user {}", notify.target);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Failed to send LINE notification to {}: {:?}",
+                            notify.target, e
+                        );
+                    }
+                }
+            }
         }
     }
 

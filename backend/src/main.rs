@@ -10,6 +10,7 @@ mod api;
 mod app;
 mod data;
 pub mod discord;
+pub mod line;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
