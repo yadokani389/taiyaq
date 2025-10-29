@@ -5,7 +5,6 @@ use bot_sdk_line::messaging_api_line::{
         TextMessageV2, template::Template,
     },
 };
-use dotenvy::dotenv;
 
 use crate::{
     api::model::AddNotificationRequest,
@@ -78,7 +77,6 @@ pub async fn handle_postback(
                 .to_string()
         }
         "action=show_access" => {
-            dotenv().ok();
             let file_id = std::env::var("ACCESS_PDF_ID")
                 .unwrap_or_else(|_| "1p0pllxIOw3fJYPGr1ymBT7p8G8KybxYO".to_string());
             let pdf_url = format!("https://drive.google.com/file/d/{}/preview", file_id);
