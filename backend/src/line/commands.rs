@@ -245,7 +245,7 @@ pub async fn send_text_reply(registry: &AppRegistry, reply_token: String, text: 
 
 async fn send_access_image_reply(registry: &AppRegistry, reply_token: String) {
     let image_url = std::env::var("ACCESS_IMAGE_URL").unwrap_or_else(|_| {
-        "https://raw.githubusercontent.com/yadokani389/taiyaq/line/backend/assets/access.png"
+        "https://raw.githubusercontent.com/yadokani389/taiyaq/main/backend/assets/access.png"
             .to_string()
     });
 
