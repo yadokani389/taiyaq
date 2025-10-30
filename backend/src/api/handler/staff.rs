@@ -3,6 +3,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
 };
+use enum_map::EnumMap;
 
 use crate::{
     api::model::{
@@ -106,6 +107,14 @@ pub async fn add_notification(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+/// GET /api/staff/flavors/config
+pub async fn get_flavor_configs(
+    State(registry): State<AppRegistry>,
+) -> Json<EnumMap<Flavor, FlavorConfig>> {
+    let data = registry.data().await;
+    Json(data.flavor_configs.clone())
 }
 
 /// PUT /api/staff/flavors/{flavor}

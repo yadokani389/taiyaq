@@ -3,8 +3,8 @@ use crate::{
         auth::staff_api_auth,
         handler::{
             add_notification, cancel_order, complete_order, create_order, get_display_orders,
-            get_order_details, get_staff_orders, get_wait_times, line_callback, set_flavor_config,
-            update_order_priority, update_production,
+            get_flavor_configs, get_order_details, get_staff_orders, get_wait_times, line_callback,
+            set_flavor_config, update_order_priority, update_production,
         },
     },
     app::AppRegistry,
@@ -25,6 +25,7 @@ pub fn routes() -> Router<AppRegistry> {
         .route("/staff/orders/{id}/cancel", post(cancel_order))
         .route("/staff/orders/{id}/priority", put(update_order_priority))
         .route("/staff/orders/{id}/notification", put(add_notification))
+        .route("/staff/flavors/config", get(get_flavor_configs))
         .route("/staff/flavors/{flavor}", put(set_flavor_config))
         .layer(middleware::from_fn(staff_api_auth));
     let line_router = Router::new().route("/line_callback", post(line_callback));

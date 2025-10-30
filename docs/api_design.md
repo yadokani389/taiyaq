@@ -103,6 +103,29 @@
 `<TOKEN>` はサーバーで設定されたAPIトークンです。
 正しいトークンが提供されない場合、APIは `401 Unauthorized` を返します。
 
+#### `GET /api/staff/flavors/config`
+
+各味の調理時間と一度に焼ける数（バッチサイズ）の設定を全て取得します。
+
+- **レスポンス:**
+
+  ```json
+  {
+    "tsubuan": {
+      "cookingTimeMinutes": 15,
+      "quantityPerBatch": 9
+    },
+    "custard": {
+      "cookingTimeMinutes": 15,
+      "quantityPerBatch": 9
+    },
+    "kurikinton": {
+      "cookingTimeMinutes": 15,
+      "quantityPerBatch": 2
+    }
+  }
+  ```
+
 #### `PUT /api/staff/flavors/{flavor}`
 
 各味の調理時間と一度に焼ける数（バッチサイズ）を設定します。
