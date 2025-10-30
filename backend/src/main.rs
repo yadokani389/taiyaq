@@ -1,8 +1,10 @@
 use std::net::SocketAddr;
 
 use api::route::routes;
+use axum::http::{HeaderName, Method};
 use dotenvy::dotenv;
 use poise::serenity_prelude::*;
+use tower_http::cors::{self, CorsLayer};
 
 use crate::app::AppRegistry;
 
@@ -29,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
                 let ret = registry.load_data().await;
                 println!("Load data result: {:?}", ret);
 
-                let app = routes().with_state(registry.clone());
+                let app = routes().with_state(registry.clone()).layer(cors());
 
                 let addr = SocketAddr::from(([127, 0, 0, 1], 38000));
                 println!("listening on {}", addr);
@@ -59,4 +61,21 @@ async fn main() -> anyhow::Result<()> {
         .expect("Failed to start client");
 
     Ok(())
+}
+
+fn cors() -> CorsLayer {
+    CorsLayer::new()
+        .allow_headers(vec![
+            HeaderName::from_static("authorization"),
+            HeaderName::from_static("content-type"),
+            HeaderName::from_static("accept"),
+        ])
+        .allow_methods(vec![
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ])
+        .allow_origin(cors::Any)
 }
