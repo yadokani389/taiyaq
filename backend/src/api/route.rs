@@ -4,7 +4,7 @@ use crate::{
         handler::{
             add_notification, cancel_order, complete_order, create_order, get_display_orders,
             get_order_details, get_staff_orders, line_callback, set_flavor_config,
-            update_production,
+            update_order_priority, update_production,
         },
     },
     app::AppRegistry,
@@ -24,6 +24,7 @@ pub fn routes() -> Router<AppRegistry> {
         .route("/staff/production", post(update_production))
         .route("/staff/orders/{id}/complete", post(complete_order))
         .route("/staff/orders/{id}/cancel", post(cancel_order))
+        .route("/staff/orders/{id}/priority", put(update_order_priority))
         .route("/staff/orders/{id}/notification", put(add_notification))
         .route("/staff/flavors/{flavor}", put(set_flavor_config))
         .layer(middleware::from_fn(staff_api_auth));

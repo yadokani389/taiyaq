@@ -58,11 +58,22 @@ impl AppRegistry {
 
         // Part 1: Fulfill what can be fulfilled now (Waiting -> Ready)
         let mut stock = std::mem::take(&mut data.unallocated_stock);
-        for order in data
+
+        // Create a list of order indices to iterate over, to avoid borrowing issues.
+        let mut waiting_order_indices: Vec<usize> = data
             .orders
-            .iter_mut()
-            .filter(|o| o.status == OrderStatus::Waiting)
-        {
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| o.status == OrderStatus::Waiting)
+            .map(|(i, _)| i)
+            .collect();
+
+        // Sort indices by priority (true first, so use reverse) and then by ordered_at.
+        waiting_order_indices
+            .sort_by_key(|&i| (!data.orders[i].is_priority, data.orders[i].ordered_at));
+
+        for index in waiting_order_indices {
+            let order = &mut data.orders[index];
             if Self::can_fulfill(order, &stock) {
                 Self::fulfill(order, &mut stock);
                 order.status = OrderStatus::Ready;
@@ -95,7 +106,8 @@ impl AppRegistry {
             .iter_mut()
             .filter(|o| o.status == OrderStatus::Waiting)
             .collect();
-        waiting_orders.sort_by_key(|o| o.ordered_at);
+        // Sort by priority (true first, so use reverse), then by time.
+        waiting_orders.sort_by_key(|o| (!o.is_priority, o.ordered_at));
 
         let mut cumulative_demand: HashMap<Flavor, usize> = HashMap::new();
 
@@ -143,7 +155,7 @@ impl AppRegistry {
         newly_ready_orders
     }
 
-    pub async fn create_order(&self, items: Vec<Item>) -> Order {
+    pub async fn create_order(&self, items: Vec<Item>, is_priority: bool) -> Order {
         let mut data = self.data.write().await;
         let new_id = data.orders.iter().map(|o| o.id).max().unwrap_or(0) + 1;
         let new_order = Order {
@@ -154,6 +166,7 @@ impl AppRegistry {
             ready_at: None,
             completed_at: None,
             notify: vec![],
+            is_priority,
         };
         data.orders.push(new_order);
 
@@ -259,6 +272,27 @@ impl AppRegistry {
         drop(data);
         self.save_data().await.ok();
         Some(cancelled_order)
+    }
+
+    pub async fn update_order_priority(&self, id: u32, is_priority: bool) -> Option<Order> {
+        let mut data = self.data.write().await;
+        let order = data.orders.iter_mut().find(|o| o.id == id)?;
+
+        // Do nothing if the priority is already set to the desired value.
+        if order.is_priority == is_priority {
+            return Some(order.clone());
+        }
+
+        order.is_priority = is_priority;
+
+        // Recalculate statuses as priority change can affect order processing sequence.
+        self.update_order_statuses(&mut data).await;
+
+        let updated_order = data.orders.iter().find(|o| o.id == id).unwrap().clone();
+
+        drop(data);
+        self.save_data().await.ok();
+        Some(updated_order)
     }
 
     pub async fn add_notification(

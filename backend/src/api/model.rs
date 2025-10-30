@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 //==// Request Bodies //==//
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateOrderRequest {
     pub items: Vec<Item>,
+    pub is_priority: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -17,6 +19,12 @@ pub struct UpdateProductionRequest {
 pub struct AddNotificationRequest {
     pub channel: NotifyChannel,
     pub target: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateOrderPriorityRequest {
+    pub is_priority: bool,
 }
 
 #[derive(Deserialize, Debug)]

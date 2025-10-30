@@ -6,8 +6,8 @@ use axum::{
 
 use crate::{
     api::model::{
-        AddNotificationRequest, CreateOrderRequest, StaffOrdersQuery, UpdateProductionRequest,
-        UpdateProductionResponse,
+        AddNotificationRequest, CreateOrderRequest, StaffOrdersQuery, UpdateOrderPriorityRequest,
+        UpdateProductionRequest, UpdateProductionResponse,
     },
     app::AppRegistry,
     data::{Flavor, FlavorConfig, Order},
@@ -37,7 +37,9 @@ pub async fn create_order(
     Json(payload): Json<CreateOrderRequest>,
 ) -> (StatusCode, Json<Order>) {
     println!("Creating order with items: {:?}", payload.items);
-    let new_order = registry.create_order(payload.items).await;
+    let new_order = registry
+        .create_order(payload.items, payload.is_priority.unwrap_or(false))
+        .await;
     (StatusCode::CREATED, Json(new_order))
 }
 
@@ -71,6 +73,22 @@ pub async fn cancel_order(
     Path(id): Path<u32>,
 ) -> Result<Json<Order>, StatusCode> {
     if let Some(order) = registry.cancel_order(id).await {
+        Ok(Json(order))
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+}
+
+/// PUT /api/staff/orders/{id}/priority
+pub async fn update_order_priority(
+    State(registry): State<AppRegistry>,
+    Path(id): Path<u32>,
+    Json(payload): Json<UpdateOrderPriorityRequest>,
+) -> Result<Json<Order>, StatusCode> {
+    if let Some(order) = registry
+        .update_order_priority(id, payload.is_priority)
+        .await
+    {
         Ok(Json(order))
     } else {
         Err(StatusCode::NOT_FOUND)

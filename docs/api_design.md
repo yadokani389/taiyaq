@@ -19,6 +19,7 @@
     "orderedAt": "string",      // 注文日時 (ISO 8601)
     "readyAt": "string | null",   // 準備完了日時 (ISO 8601)
     "completedAt": "string | null",// 受け渡し完了日時 (ISO 8601)
+    "is_priority": "boolean",   // 優先注文フラグ (割り込み予約など)
     "notify": {                 // 通知設定 (任意)
         "channel": "discord" | "email" | "line",
         "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
@@ -115,7 +116,8 @@
     "items": [
       { "flavor": "tsubuan", "quantity": 5 },
       { "flavor": "custard", "quantity": 10 }
-    ]
+    ],
+    "is_priority": false // (任意) 優先注文にする場合はtrue
   }
   ```
 
@@ -164,6 +166,22 @@
   - `id`: 注文番号 (integer)
 - **リクエストボディ:** (なし)
 - **レスポンス:** 更新された `Order` オブジェクト (statusが `cancelled` になる)
+
+#### `PUT /api/staff/orders/{id}/priority` (新規)
+
+既存の注文の優先度を更新します。
+
+- **パスパラメータ:**
+  - `id`: 注文番号 (integer)
+- **リクエストボディ:**
+
+  ```json
+  {
+    "is_priority": true
+  }
+  ```
+
+- **レスポンス:** `200 OK` と更新された `Order` オブジェクト
 
 #### `PUT /api/staff/orders/{id}/notification` (新規)
 
