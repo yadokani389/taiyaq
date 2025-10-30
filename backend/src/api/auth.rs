@@ -16,12 +16,11 @@ pub async fn staff_api_auth(req: Request<Body>, next: Next) -> Result<Response, 
 
     let api_token = env::var("STAFF_API_TOKEN").expect("STAFF_API_TOKEN must be set");
 
-    if let Some(auth_header) = auth_header {
-        if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            if token == api_token {
-                return Ok(next.run(req).await);
-            }
-        }
+    if let Some(auth_header) = auth_header
+        && let Some(token) = auth_header.strip_prefix("Bearer ")
+        && token == api_token
+    {
+        return Ok(next.run(req).await);
     }
 
     Err(StatusCode::UNAUTHORIZED)
