@@ -185,7 +185,6 @@ async fn handle_adding_notification(
         return;
     }
 
-    // get_order_details を使用（OrderDetailsResponse に items と ordered_at が必要）
     match registry.get_order_details(order_id).await {
         Some(details)
             if !matches!(
@@ -220,7 +219,6 @@ async fn handle_adding_notification(
         }
     }
 }
-
 // ========== ヘルパー関数：メッセージフォーマット ==========
 
 /// OrderDetailsResponse をユーザー向けにフォーマット
