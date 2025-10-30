@@ -9,7 +9,7 @@ pub type PoiseContext<'a> = poise::Context<'a, AppRegistry, anyhow::Error>;
 
 pub fn framework_builder() -> FrameworkBuilder<AppRegistry, anyhow::Error> {
     poise::Framework::builder().options(poise::FrameworkOptions {
-        commands: vec![commands::orders()],
+        commands: vec![commands::orders(), commands::waittime()],
         ..Default::default()
     })
 }

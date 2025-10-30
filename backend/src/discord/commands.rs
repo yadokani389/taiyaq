@@ -211,3 +211,31 @@ async fn notify(
 
     Ok(())
 }
+
+/// 現在の待ち時間を表示します
+#[poise::command(slash_command)]
+pub async fn waittime(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
+    let wait_times = ctx.data().get_current_wait_times().await;
+    let mut fields = Vec::new();
+
+    for (flavor, time) in wait_times.wait_times {
+        let time_str = time.map_or("提供なし".into(), |t| {
+            if t == 0 {
+                "すぐに提供できます".into()
+            } else {
+                format!("約{}分", t)
+            }
+        });
+        fields.push((flavor.to_string(), time_str, false));
+    }
+
+    let embed = CreateEmbed::default()
+        .title("現在の待ち時間")
+        .fields(fields)
+        .timestamp(Timestamp::now());
+
+    let builder = poise::CreateReply::default().embed(embed);
+    ctx.send(builder).await?;
+
+    Ok(())
+}
