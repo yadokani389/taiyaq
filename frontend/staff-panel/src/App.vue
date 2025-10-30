@@ -78,8 +78,30 @@ const reportBaking = () => {
   currentView.value = 'baking'
 }
 
-const openSettings = () => {
+const openSettings = async () => {
   currentView.value = 'settings'
+  await loadFlavorConfigs()
+}
+
+const loadFlavorConfigs = async () => {
+  try {
+    const response = await flavorsApi.getFlavorConfigs()
+    console.log('Loaded flavor configs:', response.data)
+
+    const configs = response.data
+    if (configs?.tsubuan) {
+      settings.value.つぶあん = configs.tsubuan
+    }
+    if (configs?.custard) {
+      settings.value.カスタード = configs.custard
+    }
+    if (configs?.kurikinton) {
+      settings.value.栗きんとん = configs.kurikinton
+    }
+  } catch (error) {
+    console.error('Failed to load flavor configs:', error)
+    alert('設定の読み込みに失敗しました')
+  }
 }
 
 const submitOrder = async () => {

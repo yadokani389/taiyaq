@@ -2,6 +2,10 @@ import { apiClient } from '../client'
 import type { Flavor, FlavorConfig, ApiResponse } from '../types'
 
 export class FlavorsApi {
+  async getFlavorConfigs(): Promise<ApiResponse<Record<Flavor, FlavorConfig>>> {
+    return apiClient.get<Record<Flavor, FlavorConfig>>('/api/staff/flavors/config')
+  }
+
   async updateFlavorConfig(
     flavor: Flavor,
     config: FlavorConfig,
