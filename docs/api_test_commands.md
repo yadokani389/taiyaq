@@ -15,6 +15,13 @@ STAFF_API_TOKEN="your_secret_token_here"
 
 各味の調理時間とバッチサイズを設定します。
 
+### `GET /api/staff/flavors/config`
+
+```bash
+curl -X GET "${BASE_URL}/api/staff/flavors/config" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}"
+```
+
 ### `PUT /api/staff/flavors/{flavor}`
 
 ```bash
