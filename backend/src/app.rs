@@ -166,7 +166,7 @@ impl AppRegistry {
             ordered_at: Utc::now(),
             ready_at: None,
             completed_at: None,
-            notify: vec![],
+            notify: Default::default(),
             is_priority,
         };
         data.orders.push(new_order);
@@ -303,7 +303,7 @@ impl AppRegistry {
     ) -> Option<Order> {
         let mut data = self.data.write().await;
         let order = data.orders.iter_mut().find(|o| o.id == id)?;
-        order.notify.push(Notify {
+        order.notify.insert(Notify {
             channel: payload.channel,
             target: payload.target,
         });

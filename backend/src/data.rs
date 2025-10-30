@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use chrono::{DateTime, Utc};
@@ -72,7 +72,7 @@ pub struct Order {
     pub ordered_at: DateTime<Utc>,
     pub ready_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
-    pub notify: Vec<Notify>,
+    pub notify: HashSet<Notify>,
     pub is_priority: bool,
 }
 
@@ -93,13 +93,13 @@ pub enum OrderStatus {
     Cancelled,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Notify {
     pub channel: NotifyChannel,
     pub target: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum NotifyChannel {
     Discord,
