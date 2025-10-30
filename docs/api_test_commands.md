@@ -61,7 +61,7 @@ curl -X POST "${BASE_URL}/api/staff/orders" \
      -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -d '{
           "items": [
-            {"flavor": "anko", "quantity": 2},
+            {"flavor": "tsubuan", "quantity": 2},
             {"flavor": "custard", "quantity": 1}
           ]
         }'
@@ -72,7 +72,7 @@ curl -X POST "${BASE_URL}/api/staff/orders" \
      -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -d '{
           "items": [
-            {"flavor": "anko", "quantity": 3}
+            {"flavor": "tsubuan", "quantity": 3}
           ]
         }'
 
