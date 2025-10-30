@@ -23,9 +23,19 @@ async fn main() -> anyhow::Result<()> {
     std::env::var("STAFF_API_TOKEN").expect("Missing STAFF_API_TOKEN");
 
     let framework = discord::framework_builder()
-        .setup(|ctx, _ready, framework| {
+        .setup(|ctx, _ready, _framework| {
             Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                poise::builtins::register_globally(ctx, &discord::global_commands()).await?;
+                let guild_id: u64 = std::env::var("DISCORD_GUILD_ID")
+                    .expect("Missing DISCORD_GUILD_ID")
+                    .parse()
+                    .expect("DISCORD_GUILD_ID must be a valid u64");
+                poise::builtins::register_in_guild(
+                    ctx,
+                    &discord::guild_commands(),
+                    guild_id.into(),
+                )
+                .await?;
 
                 let registry = AppRegistry::new(line_token, ctx.clone());
                 let ret = registry.load_data().await;
