@@ -103,6 +103,5 @@ pub struct Notify {
 #[serde(rename_all = "camelCase")]
 pub enum NotifyChannel {
     Discord,
-    Email,
     Line,
 }

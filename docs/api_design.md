@@ -22,8 +22,8 @@
     "is_priority": "boolean",   // 優先注文フラグ (割り込み予約など)
     "notify": [
         {
-            "channel": "discord" | "email" | "line",
-            "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
+            "channel": "discord" | "line",
+            "target": "string" // DiscordのID、またはLINEユーザーID
         }
     ] // 通知設定 (配列)
 }
@@ -216,8 +216,8 @@
 
   ```json
   {
-      "channel": "discord" | "email" | "line",
-      "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
+      "channel": "discord" | "line",
+      "target": "string" // DiscordのID、またはLINEユーザーID
   }
   ```
 

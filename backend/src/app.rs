@@ -328,7 +328,6 @@ impl AppRegistry {
                     discord::send_dm(&ctx, user_id, &message).await.ok();
                 }
             }
-            NotifyChannel::Email => todo!(),
             NotifyChannel::Line => {
                 let line = self.line.lock().await;
                 let push_request = PushMessageRequest {
