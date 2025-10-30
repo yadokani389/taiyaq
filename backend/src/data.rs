@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
+use enum_map::{Enum, EnumMap, enum_map};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Serialize, Deserialize, Debug, Enum, Clone, PartialEq, Eq, Hash, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum Flavor {
     Tsubuan,
@@ -22,7 +23,7 @@ impl fmt::Display for Flavor {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct FlavorConfig {
     pub cooking_time_minutes: u32,
@@ -30,11 +31,35 @@ pub struct FlavorConfig {
 }
 
 // Data holds the core business data.
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Data {
     pub orders: Vec<Order>,
     pub unallocated_stock: HashMap<Flavor, usize>,
-    pub flavor_configs: HashMap<Flavor, FlavorConfig>,
+    pub flavor_configs: EnumMap<Flavor, FlavorConfig>,
+}
+
+impl Data {
+    pub fn new() -> Self {
+        let flavor_configs = enum_map! {
+            Flavor::Tsubuan => FlavorConfig {
+                cooking_time_minutes: 15,
+                quantity_per_batch: 9,
+            },
+            Flavor::Custard => FlavorConfig {
+                cooking_time_minutes: 15,
+                quantity_per_batch: 9,
+            },
+            Flavor::Kurikinton => FlavorConfig {
+                cooking_time_minutes: 15,
+                quantity_per_batch: 2,
+            },
+        };
+        Self {
+            orders: Vec::new(),
+            unallocated_stock: HashMap::new(),
+            flavor_configs,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

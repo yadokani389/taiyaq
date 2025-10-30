@@ -27,7 +27,7 @@ impl AppRegistry {
 
     pub fn new(line_token: String, ctx: Context) -> Self {
         Self {
-            data: Arc::new(RwLock::new(Data::default())),
+            data: Arc::new(RwLock::new(Data::new())),
             line: Arc::new(Mutex::new(LINE::new(line_token))),
             discord_ctx: Arc::new(Mutex::new(ctx)),
         }
@@ -127,18 +127,17 @@ impl AppRegistry {
                 let needed_from_production = total_demand_for_item.saturating_sub(current_stock);
 
                 if needed_from_production > 0 {
-                    if let Some(config) = data.flavor_configs.get(&item.flavor) {
-                        // If the items needed from production exceed what the first batch can provide,
-                        // then this order is not in the "cooking" phase.
-                        if needed_from_production > config.quantity_per_batch as usize {
-                            is_cooking = false;
-                            break; // No need to check other items in this order
-                        }
-                    } else {
-                        // No config for this flavor, so it can't be determined to be 'cooking'.
+                    let config = data.flavor_configs[item.flavor];
+                    // If the items needed from production exceed what the first batch can provide,
+                    // then this order is not in the "cooking" phase.
+                    if needed_from_production > config.quantity_per_batch as usize {
                         is_cooking = false;
-                        break;
+                        break; // No need to check other items in this order
                     }
+                } else {
+                    // No config for this flavor, so it can't be determined to be 'cooking'.
+                    is_cooking = false;
+                    break;
                 }
             }
 
@@ -401,19 +400,16 @@ impl AppRegistry {
                 }
 
                 // 3. Calculate batches and time based on config.
-                let wait_time_for_flavor =
-                    if let Some(config) = data.flavor_configs.get(&flavor_to_calc) {
-                        if config.quantity_per_batch > 0 {
-                            let batches_needed =
-                                needed_from_production.div_ceil(config.quantity_per_batch as usize);
-                            batches_needed as i64 * config.cooking_time_minutes as i64
-                        } else {
-                            0 // Avoid division by zero, assume no wait time if batch size is 0.
-                        }
+                let wait_time_for_flavor = {
+                    let config = data.flavor_configs[flavor_to_calc];
+                    if config.quantity_per_batch > 0 {
+                        let batches_needed =
+                            needed_from_production.div_ceil(config.quantity_per_batch as usize);
+                        batches_needed as i64 * config.cooking_time_minutes as i64
                     } else {
-                        // Config not found. A real implementation should log this.
-                        0
-                    };
+                        0 // Avoid division by zero, assume no wait time if batch size is 0.
+                    }
+                };
 
                 // 4. Update the max wait time for the order.
                 if wait_time_for_flavor > max_wait_time {
@@ -435,7 +431,7 @@ impl AppRegistry {
 
     pub async fn set_flavor_config(&self, flavor: Flavor, config: FlavorConfig) {
         let mut data = self.data.write().await;
-        data.flavor_configs.insert(flavor, config);
+        data.flavor_configs[flavor] = config;
         drop(data);
         self.save_data().await.ok();
     }

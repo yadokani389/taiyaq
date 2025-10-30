@@ -20,6 +20,7 @@ STAFF_API_TOKEN="your_secret_token_here"
 ```bash
 # つぶあんの設定
 curl -X PUT "${BASE_URL}/api/staff/flavors/tsubuan" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -H "Content-Type: application/json" \
      -d '{
           "cookingTimeMinutes": 15,
@@ -28,6 +29,7 @@ curl -X PUT "${BASE_URL}/api/staff/flavors/tsubuan" \
 
 # カスタードの設定
 curl -X PUT "${BASE_URL}/api/staff/flavors/custard" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -H "Content-Type: application/json" \
      -d '{
           "cookingTimeMinutes": 15,
@@ -36,6 +38,7 @@ curl -X PUT "${BASE_URL}/api/staff/flavors/custard" \
 
 # 栗きんとんの設定
 curl -X PUT "${BASE_URL}/api/staff/flavors/kurikinton" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
      -H "Content-Type: application/json" \
      -d '{
           "cookingTimeMinutes": 15,
