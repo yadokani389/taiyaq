@@ -20,7 +20,12 @@ rustPlatform.buildRustPackage {
       );
     };
 
-  cargoDeps = rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
+  cargoDeps = rustPlatform.importCargoLock {
+    lockFile = ./Cargo.lock;
+    outputHashes = {
+      "bot_sdk_line-0.1.1" = "sha256-E+I4ANLYcajpBzZ3vuEgztOEGJ5w6zgKRyaPhpyNhso=";
+    };
+  };
 
   nativeBuildInputs = with pkgs; [
     pkg-config
