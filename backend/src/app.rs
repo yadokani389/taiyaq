@@ -56,7 +56,16 @@ impl AppRegistry {
     async fn update_order_statuses(&self, data: &mut Data) -> Vec<u32> {
         let mut newly_ready_orders = Vec::new();
 
-        // Part 1: Fulfill what can be fulfilled now (Waiting -> Ready)
+        // Part 1: Reset remaining Cooking orders to Waiting to prepare for recalculation
+        for order in data
+            .orders
+            .iter_mut()
+            .filter(|o| o.status == OrderStatus::Cooking)
+        {
+            order.status = OrderStatus::Waiting;
+        }
+
+        // Part 2: Fulfill what can be fulfilled now (Waiting -> Ready)
         let mut stock = std::mem::take(&mut data.unallocated_stock);
 
         // Create a list of order indices to iterate over, to avoid borrowing issues.
@@ -90,15 +99,6 @@ impl AppRegistry {
             }
         }
         data.unallocated_stock = stock; // Put the remaining stock back
-
-        // Part 2: Reset remaining Cooking orders to Waiting to prepare for recalculation
-        for order in data
-            .orders
-            .iter_mut()
-            .filter(|o| o.status == OrderStatus::Cooking)
-        {
-            order.status = OrderStatus::Waiting;
-        }
 
         // Part 3: Find new 'Cooking' orders from the now-complete 'Waiting' pool
         let mut waiting_orders: Vec<&mut Order> = data
