@@ -50,64 +50,143 @@ impl AppRegistry {
         self.data.read().await
     }
 
-    // Atomically creates a new order and returns it.
+    // Recalculates and updates the status for all orders based on current stock and demand.
+    // This is the core logic for transitioning orders to 'Ready' or 'Cooking'.
+    // Returns a list of order IDs that have newly become 'Ready'.
+    async fn update_order_statuses(&self, data: &mut Data) -> Vec<u32> {
+        let mut newly_ready_orders = Vec::new();
+
+        // Part 1: Fulfill what can be fulfilled now (Waiting -> Ready)
+        let mut stock = std::mem::take(&mut data.unallocated_stock);
+        for order in data
+            .orders
+            .iter_mut()
+            .filter(|o| o.status == OrderStatus::Waiting)
+        {
+            if Self::can_fulfill(order, &stock) {
+                Self::fulfill(order, &mut stock);
+                order.status = OrderStatus::Ready;
+                order.ready_at.replace(Utc::now());
+                newly_ready_orders.push(order.id);
+                for notify in &order.notify {
+                    self.send_notification(
+                        order.id,
+                        notify,
+                        format!("#{}番 のご注文の準備ができました！", order.id),
+                    )
+                    .await;
+                }
+            }
+        }
+        data.unallocated_stock = stock; // Put the remaining stock back
+
+        // Part 2: Reset remaining Cooking orders to Waiting to prepare for recalculation
+        for order in data
+            .orders
+            .iter_mut()
+            .filter(|o| o.status == OrderStatus::Cooking)
+        {
+            order.status = OrderStatus::Waiting;
+        }
+
+        // Part 3: Find new 'Cooking' orders from the now-complete 'Waiting' pool
+        let mut waiting_orders: Vec<&mut Order> = data
+            .orders
+            .iter_mut()
+            .filter(|o| o.status == OrderStatus::Waiting)
+            .collect();
+        waiting_orders.sort_by_key(|o| o.ordered_at);
+
+        let mut cumulative_demand: HashMap<Flavor, usize> = HashMap::new();
+
+        for order in waiting_orders {
+            let mut is_cooking = !order.items.is_empty();
+
+            for item in &order.items {
+                let demand_so_far = cumulative_demand.get(&item.flavor).copied().unwrap_or(0);
+                let current_stock = data
+                    .unallocated_stock
+                    .get(&item.flavor)
+                    .copied()
+                    .unwrap_or(0);
+
+                // How many items need to be produced to fulfill demand up to this point (including current item)
+                let total_demand_for_item = demand_so_far + item.quantity;
+                let needed_from_production = total_demand_for_item.saturating_sub(current_stock);
+
+                if needed_from_production > 0 {
+                    if let Some(config) = data.flavor_configs.get(&item.flavor) {
+                        // If the items needed from production exceed what the first batch can provide,
+                        // then this order is not in the "cooking" phase.
+                        if needed_from_production > config.quantity_per_batch as usize {
+                            is_cooking = false;
+                            break; // No need to check other items in this order
+                        }
+                    } else {
+                        // No config for this flavor, so it can't be determined to be 'cooking'.
+                        is_cooking = false;
+                        break;
+                    }
+                }
+            }
+
+            if is_cooking {
+                order.status = OrderStatus::Cooking;
+            }
+
+            // Update cumulative demand for the next iteration
+            for item in &order.items {
+                *cumulative_demand.entry(item.flavor).or_insert(0) += item.quantity;
+            }
+        }
+
+        newly_ready_orders
+    }
+
     pub async fn create_order(&self, items: Vec<Item>) -> Order {
         let mut data = self.data.write().await;
         let new_id = data.orders.iter().map(|o| o.id).max().unwrap_or(0) + 1;
         let new_order = Order {
             id: new_id,
             items,
-            status: OrderStatus::Waiting, // All new orders start as 'waiting'
+            status: OrderStatus::Waiting, // Start as waiting
             ordered_at: Utc::now(),
             ready_at: None,
             completed_at: None,
             notify: vec![],
         };
-        data.orders.push(new_order.clone());
+        data.orders.push(new_order);
+
+        // Recalculate statuses
+        self.update_order_statuses(&mut data).await;
+
+        // Find the order we just added to return its (potentially updated) state
+        let result_order = data.orders.iter().find(|o| o.id == new_id).unwrap().clone();
+
         drop(data);
         self.save_data().await.ok();
-        new_order
+        result_order
     }
 
     // Updates stock and fulfills waiting orders.
     pub async fn update_production(&self, production: Vec<Item>) -> (Vec<u32>, Vec<Item>) {
         let mut data = self.data.write().await;
 
+        // Add new production to stock
         for item in production {
             *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
         }
 
-        let mut newly_ready_orders = Vec::new();
-        let mut temp_unallocated_stock = std::mem::take(&mut data.unallocated_stock);
+        // Recalculate statuses
+        let newly_ready_orders = self.update_order_statuses(&mut data).await;
 
-        for order in data
-            .orders
-            .iter_mut()
-            .filter(|o| o.status == OrderStatus::Waiting)
-        {
-            if Self::can_fulfill(order, &temp_unallocated_stock) {
-                Self::fulfill(order, &mut temp_unallocated_stock);
-                order.status = OrderStatus::Ready;
-                order.ready_at = Some(Utc::now());
-                newly_ready_orders.push(order.id);
-                for notify in &order.notify {
-                    self.send_notification(
-                        order.id,
-                        notify,
-                        format!("Your order #{} is ready for pickup!", order.id),
-                    )
-                    .await;
-                }
-            }
-        }
-        data.unallocated_stock = temp_unallocated_stock;
-
+        // Collect unallocated items for the response
         let unallocated_items = data
             .unallocated_stock
             .iter()
             .filter(|&(_, &quantity)| quantity > 0)
             .map(|(flavor, &quantity)| Item {
-                flavor: flavor.clone(),
+                flavor: *flavor,
                 quantity,
             })
             .collect();
@@ -148,25 +227,38 @@ impl AppRegistry {
 
     pub async fn cancel_order(&self, id: u32) -> Option<Order> {
         let mut data = self.data.write().await;
-        let Data {
-            ref mut orders,
-            ref mut unallocated_stock,
-            ..
-        } = *data;
-        let order = orders.iter_mut().find(|o| o.id == id)?;
-        // If the order was already ready, its items were deducted from unallocated_stock.
-        // When cancelled, these items should be returned to unallocated_stock.
-        if order.status == OrderStatus::Ready {
-            for item in &order.items {
-                *unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
-            }
-        }
-        order.status = OrderStatus::Cancelled;
 
-        let order = order.clone();
+        // Find the index of the order to avoid borrowing issues
+        let order_idx = data.orders.iter().position(|o| o.id == id)?;
+        let items_to_return = if data.orders[order_idx].status == OrderStatus::Ready {
+            // Clone the items to release the borrow on `data.orders`
+            Some(data.orders[order_idx].items.clone())
+        } else {
+            None
+        };
+
+        // Now, modify the order status
+        data.orders[order_idx].status = OrderStatus::Cancelled;
+        let cancelled_order = data.orders[order_idx].clone();
+
+        let stock_was_changed = if let Some(items) = items_to_return {
+            // Now we can mutably borrow `data.unallocated_stock` because the borrow for `items` is gone
+            for item in items {
+                *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
+            }
+            true
+        } else {
+            false
+        };
+
+        // If stock was changed, other orders might have become ready or cooking
+        if stock_was_changed {
+            self.update_order_statuses(&mut data).await;
+        }
+
         drop(data);
         self.save_data().await.ok();
-        Some(order)
+        Some(cancelled_order)
     }
 
     pub async fn add_notification(
@@ -279,8 +371,7 @@ impl AppRegistry {
                     if let Some(config) = data.flavor_configs.get(&flavor_to_calc) {
                         if config.quantity_per_batch > 0 {
                             let batches_needed =
-                                (needed_from_production + config.quantity_per_batch as usize - 1)
-                                    / config.quantity_per_batch as usize;
+                                needed_from_production.div_ceil(config.quantity_per_batch as usize);
                             batches_needed as i64 * config.cooking_time_minutes as i64
                         } else {
                             0 // Avoid division by zero, assume no wait time if batch size is 0.
