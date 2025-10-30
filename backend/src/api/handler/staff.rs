@@ -114,7 +114,7 @@ pub async fn get_flavor_configs(
     State(registry): State<AppRegistry>,
 ) -> Json<EnumMap<Flavor, FlavorConfig>> {
     let data = registry.data().await;
-    Json(data.flavor_configs.clone())
+    Json(data.flavor_configs)
 }
 
 /// PUT /api/staff/flavors/{flavor}
