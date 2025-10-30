@@ -1,4 +1,5 @@
-use crate::data::{Item, NotifyChannel, OrderStatus};
+use crate::data::{Flavor, Item, NotifyChannel, OrderStatus};
+use enum_map::EnumMap;
 use serde::{Deserialize, Serialize};
 
 //==// Request Bodies //==//
@@ -82,6 +83,12 @@ pub struct OrderDetailsResponse {
     pub id: u32,
     pub status: OrderStatus,
     pub estimated_wait_minutes: Option<i64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WaitTimeResponse {
+    pub wait_times: EnumMap<Flavor, Option<i64>>,
 }
 
 #[derive(Serialize)]

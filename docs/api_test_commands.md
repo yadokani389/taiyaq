@@ -154,6 +154,16 @@ curl -X GET "${BASE_URL}/api/orders/1"
 curl -X GET "${BASE_URL}/api/orders/3"
 ```
 
+## 6-2. ユーザー/ディスプレイAPI: 待ち時間の取得
+
+現在のフレーバーごとの待ち時間を取得します。
+
+### `GET /api/wait-times`
+
+```bash
+curl -X GET "${BASE_URL}/api/wait-times"
+```
+
 ## 7. スタッフAPI: 注文への通知設定
 
 注文の通知先を設定します。
@@ -161,11 +171,14 @@ curl -X GET "${BASE_URL}/api/orders/3"
 ### `PUT /api/staff/orders/{id}/notification`
 
 ```bash
-# 注文3にメール通知を追加
+# 注文3にDiscord通知を追加
 curl -X PUT "${BASE_URL}/api/staff/orders/3/notification" \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer ${STAFF_API_TOKEN}" \
-
+     -d '{
+          "channel": "discord",
+          "target": "<YOUR_DISCORD_USER_ID>"
+     }'
 ```
 
 ## 8. スタッフAPI: 注文の完了

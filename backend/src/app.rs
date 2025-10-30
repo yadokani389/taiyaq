@@ -7,10 +7,12 @@ use bot_sdk_line::messaging_api_line::{
     models::{Message, PushMessageRequest, TextMessageV2},
 };
 use chrono::Utc;
+use enum_map::EnumMap;
 use poise::serenity_prelude::Context;
+use strum::IntoEnumIterator;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
-use crate::api::model::{AddNotificationRequest, OrderDetailsResponse};
+use crate::api::model::{AddNotificationRequest, OrderDetailsResponse, WaitTimeResponse};
 use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, NotifyChannel, Order, OrderStatus};
 use crate::discord;
 
@@ -27,7 +29,7 @@ impl AppRegistry {
 
     pub fn new(line_token: String, ctx: Context) -> Self {
         Self {
-            data: Arc::new(RwLock::new(Data::new())),
+            data: Arc::new(RwLock::new(Data::default())),
             line: Arc::new(Mutex::new(LINE::new(line_token))),
             discord_ctx: Arc::new(Mutex::new(ctx)),
         }
@@ -427,6 +429,49 @@ impl AppRegistry {
             status: order.status,
             estimated_wait_minutes,
         })
+    }
+
+    pub async fn get_current_wait_times(&self) -> WaitTimeResponse {
+        let data = self.data.read().await;
+        let mut wait_times = EnumMap::from_fn(|_| None);
+
+        for flavor in Flavor::iter() {
+            // 1. Calculate total demand for this flavor from all waiting/cooking orders.
+            let demand_before_me = data
+                .orders
+                .iter()
+                .filter(|o| o.status == OrderStatus::Waiting || o.status == OrderStatus::Cooking)
+                .flat_map(|o| &o.items)
+                .filter(|item| item.flavor == flavor)
+                .map(|item| item.quantity)
+                .sum::<usize>();
+
+            // We are calculating for a hypothetical new order of 1 item.
+            let total_demand = demand_before_me + 1;
+
+            // 2. Subtract available stock.
+            let stock_for_flavor = data.unallocated_stock.get(&flavor).copied().unwrap_or(0);
+
+            let estimated_wait_minutes = if total_demand <= stock_for_flavor {
+                Some(0)
+            } else {
+                let needed_from_production = total_demand.saturating_sub(stock_for_flavor);
+
+                // 3. Calculate batches and time based on config.
+                let config = data.flavor_configs[flavor];
+                if config.quantity_per_batch > 0 {
+                    let batches_needed =
+                        needed_from_production.div_ceil(config.quantity_per_batch as usize);
+                    Some(batches_needed as i64 * config.cooking_time_minutes as i64)
+                } else {
+                    None // Cannot be produced
+                }
+            };
+
+            wait_times[flavor] = estimated_wait_minutes;
+        }
+
+        WaitTimeResponse { wait_times }
     }
 
     pub async fn set_flavor_config(&self, flavor: Flavor, config: FlavorConfig) {

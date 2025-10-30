@@ -4,8 +4,9 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use enum_map::{Enum, EnumMap, enum_map};
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 
-#[derive(Serialize, Deserialize, Debug, Enum, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Serialize, Deserialize, Debug, Enum, EnumIter, Clone, PartialEq, Eq, Hash, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum Flavor {
     Tsubuan,
@@ -38,8 +39,8 @@ pub struct Data {
     pub flavor_configs: EnumMap<Flavor, FlavorConfig>,
 }
 
-impl Data {
-    pub fn new() -> Self {
+impl Default for Data {
+    fn default() -> Self {
         let flavor_configs = enum_map! {
             Flavor::Tsubuan => FlavorConfig {
                 cooking_time_minutes: 15,

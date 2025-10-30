@@ -5,7 +5,7 @@ use axum::{
 };
 
 use crate::{
-    api::model::{DisplayOrder, DisplayOrdersResponse, OrderDetailsResponse},
+    api::model::{DisplayOrder, DisplayOrdersResponse, OrderDetailsResponse, WaitTimeResponse},
     app::AppRegistry,
     data::OrderStatus,
 };
@@ -47,4 +47,9 @@ pub async fn get_order_details(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+/// GET /api/wait-times
+pub async fn get_wait_times(State(registry): State<AppRegistry>) -> Json<WaitTimeResponse> {
+    Json(registry.get_current_wait_times().await)
 }

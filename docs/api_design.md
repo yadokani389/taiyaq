@@ -20,10 +20,12 @@
     "readyAt": "string | null",   // 準備完了日時 (ISO 8601)
     "completedAt": "string | null",// 受け渡し完了日時 (ISO 8601)
     "is_priority": "boolean",   // 優先注文フラグ (割り込み予約など)
-    "notify": {                 // 通知設定 (任意)
-        "channel": "discord" | "email" | "line",
-        "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
-    } | null
+    "notify": [
+        {
+            "channel": "discord" | "email" | "line",
+            "target": "string" // DiscordのID、Emailアドレス、またはLINEユーザーID
+        }
+    ] // 通知設定 (配列)
 }
 ```
 
@@ -74,6 +76,24 @@
   ```
 
   _推定時間の計算は、前の注文数や厨房の生産能力からバックエンドで計算することを想定しています。_
+
+#### `GET /api/wait-times`
+
+現在のフレーバーごとの待ち時間を取得するためのAPIです。ユーザーが注文前に待ち時間を確認するのに使用します。
+
+- **レスポンス:**
+
+  ```json
+  {
+    "waitTimes": {
+      "tsubuan": 15,
+      "custard": 30,
+      "kurikinton": null
+    }
+  }
+  ```
+
+  _`estimatedWaitMinutes`が`null`の場合は、そのフレーバーが現在提供不可（例：バッチサイズが0）であることを示します。_
 
 ### 【スタッフ向けAPI】
 
