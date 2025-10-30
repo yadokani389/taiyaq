@@ -9,7 +9,7 @@ use bot_sdk_line::messaging_api_line::{
 use crate::{
     api::model::AddNotificationRequest,
     app::AppRegistry,
-    data::{NotifyChannel, Order, OrderStatus},
+    data::{NotifyChannel, OrderStatus},
 };
 
 // ========== 公開API: イベントハンドラー ==========
@@ -98,17 +98,11 @@ pub async fn handle_postback(
 
 /// 注文状況を確認
 async fn handle_check_order_status(registry: &AppRegistry, reply_token: String, order_id: u32) {
-    match registry.get_order_details(order_id).await {
-        Some(details) => {
-            let data = registry.data().await;
-            if let Some(order) = data.orders.iter().find(|o| o.id == order_id) {
-                let reply_text = format_order_status(order, details.estimated_wait_minutes);
-                send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
-            } else {
-                send_error_message(registry, reply_token, order_id, "が見つかりません").await;
-            }
-        }
-        _ => send_error_message(registry, reply_token, order_id, "が見つかりません").await,
+    if let Some(details) = registry.get_order_details(order_id).await {
+        let reply_text = format_order_details(&details);
+        send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
+    } else {
+        send_error_message(registry, reply_token, order_id, "が見つかりません").await;
     }
 }
 
@@ -191,11 +185,15 @@ async fn handle_adding_notification(
         return;
     }
 
-    let data = registry.data().await;
-
-    match validate_order_for_notification(&data.orders, order_id) {
-        Ok(order) => {
-            let confirm_template = create_notification_confirm_template(&order);
+    // get_order_details を使用（OrderDetailsResponse に items と ordered_at が必要）
+    match registry.get_order_details(order_id).await {
+        Some(details)
+            if !matches!(
+                details.status,
+                OrderStatus::Completed | OrderStatus::Cancelled
+            ) =>
+        {
+            let confirm_template = create_notification_confirm_template(&details);
             send_reply(
                 registry,
                 reply_token,
@@ -206,39 +204,28 @@ async fn handle_adding_notification(
             )
             .await;
         }
-        Err(error_msg) => {
-            send_reply(registry, reply_token, vec![create_text_message(error_msg)]).await;
+        Some(_) => {
+            send_reply(
+                registry,
+                reply_token,
+                vec![create_text_message(format!(
+                    "❌ 注文 {} はすでに完了/キャンセルされています。",
+                    order_id
+                ))],
+            )
+            .await;
+        }
+        None => {
+            send_error_message(registry, reply_token, order_id, "が見つかりません").await;
         }
     }
 }
 
-// ========== ヘルパー関数：バリデーション ==========
-
-/// 通知登録可能な注文か検証
-fn validate_order_for_notification(orders: &[Order], order_id: u32) -> Result<Order, String> {
-    let order = orders
-        .iter()
-        .find(|o| o.id == order_id)
-        .ok_or_else(|| format!("❌ 注文 {} が見つかりません。", order_id))?;
-
-    if matches!(
-        order.status,
-        OrderStatus::Completed | OrderStatus::Cancelled
-    ) {
-        return Err(format!(
-            "❌ 注文 {} はすでに完了/キャンセルされています。",
-            order_id
-        ));
-    }
-
-    Ok(order.clone())
-}
-
 // ========== ヘルパー関数：メッセージフォーマット ==========
 
-/// 注文ステータスをフォーマット
-fn format_order_status(order: &Order, estimated_wait_minutes: Option<i64>) -> String {
-    let status_text = match order.status {
+/// OrderDetailsResponse をユーザー向けにフォーマット
+fn format_order_details(details: &crate::api::model::OrderDetailsResponse) -> String {
+    let status_text = match details.status {
         OrderStatus::Waiting => "⏳ 待機中",
         OrderStatus::Cooking => "🍳 調理中",
         OrderStatus::Ready => "✅ 受け取り準備完了",
@@ -246,20 +233,22 @@ fn format_order_status(order: &Order, estimated_wait_minutes: Option<i64>) -> St
         OrderStatus::Cancelled => "❌ キャンセル",
     };
 
-    let items_str = order
+    let items_str = details
         .items
         .iter()
         .map(|item| format!("  ・{} x{}", item.flavor, item.quantity))
         .collect::<Vec<_>>()
         .join("\n");
 
-    let ordered_at_str = order.ordered_at.format("%Y年%m月%d日 %H:%M").to_string();
+    let ordered_at_str = details.ordered_at.format("%Y年%m月%d日 %H:%M").to_string();
 
-    let wait_time_str = estimated_wait_minutes.map_or("N/A".to_string(), |m| format!("{} 分", m));
+    let wait_time_str = details
+        .estimated_wait_minutes
+        .map_or("N/A".to_string(), |m| format!("{} 分", m));
 
     format!(
         "📦 注文 #{}\n\n【現在の状態】\n{}\n\n【予想待ち時間】\n{}\n\n【商品】\n{}\n\n【注文時刻】\n{}",
-        order.id, status_text, wait_time_str, items_str, ordered_at_str
+        details.id, status_text, wait_time_str, items_str, ordered_at_str
     )
 }
 
@@ -330,28 +319,33 @@ fn create_notification_success_template(order_id: u32) -> ButtonsTemplate {
     }
 }
 
-/// 通知登録確認のテンプレートを作成
-fn create_notification_confirm_template(order: &Order) -> ConfirmTemplate {
-    let items_str = order
+/// 通知登録確認のテンプレートを作成（OrderDetailsResponse 版）
+fn create_notification_confirm_template(
+    details: &crate::api::model::OrderDetailsResponse,
+) -> ConfirmTemplate {
+    let items_str = details
         .items
         .iter()
         .map(|item| format!("・{} x{}", item.flavor, item.quantity))
         .collect::<Vec<_>>()
         .join("\n");
 
-    let ordered_at_str = order.ordered_at.format("%Y年%m月%d日 %H:%M:%S").to_string();
+    let ordered_at_str = details
+        .ordered_at
+        .format("%Y年%m月%d日 %H:%M:%S")
+        .to_string();
 
     ConfirmTemplate {
         r#type: None,
         text: format!(
             "📝 注文 #{} の通知設定\n\n以下の注文で通知を登録しますか？\n\n【商品】\n{}\n\n【注文時刻】\n{}",
-            order.id, items_str, ordered_at_str
+            details.id, items_str, ordered_at_str
         ),
         actions: vec![
             Action::PostbackAction(PostbackAction {
                 r#type: None,
                 label: Some("はい".to_string()),
-                data: Some(format!("notify_confirm_{}", order.id)),
+                data: Some(format!("notify_confirm_{}", details.id)),
                 display_text: Some("通知を登録しました".to_string()),
                 text: None,
                 input_option: None,
@@ -360,7 +354,7 @@ fn create_notification_confirm_template(order: &Order) -> ConfirmTemplate {
             Action::PostbackAction(PostbackAction {
                 r#type: None,
                 label: Some("いいえ".to_string()),
-                data: Some(format!("notify_cancel_{}", order.id)),
+                data: Some(format!("notify_cancel_{}", details.id)),
                 display_text: Some("キャンセルしました".to_string()),
                 text: None,
                 input_option: None,
