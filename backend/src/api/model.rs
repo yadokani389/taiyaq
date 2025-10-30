@@ -68,6 +68,7 @@ where
 pub struct DisplayOrdersResponse {
     pub ready: Vec<DisplayOrder>,
     pub cooking: Vec<DisplayOrder>,
+    pub waiting: Vec<DisplayOrder>,
 }
 
 #[derive(Serialize)]

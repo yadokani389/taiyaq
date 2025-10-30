@@ -29,25 +29,6 @@
 
 ## 2. APIエンドポイント
 
-### 【スタッフ向けAPI】
-
-#### `PUT /api/staff/flavors/{flavor}`
-
-各味の調理時間と一度に焼ける数（バッチサイズ）を設定します。
-
-- **パスパラメータ:**
-  - `flavor`: `tsubuan` | `custard` | `kurikinton`
-- **リクエストボディ:**
-
-  ```json
-  {
-    "cookingTimeMinutes": 10,
-    "quantityPerBatch": 8
-  }
-  ```
-
-- **レスポンス:** `200 OK` と更新された設定オブジェクト
-
 ### 【ユーザー・店頭ディスプレイ向けAPI】
 
 #### `GET /api/orders/display`
@@ -67,6 +48,11 @@
       // 現在調理中
       { "id": 103 },
       { "id": 104 }
+    ],
+    "waiting": [
+      // 待機中
+      { "id": 105 },
+      { "id": 106 }
     ]
   }
   ```
@@ -96,6 +82,23 @@
 すべてのスタッフ向けAPIエンドポイントは、`Authorization: Bearer <TOKEN>` ヘッダーによる認証を必要とします。
 `<TOKEN>` はサーバーで設定されたAPIトークンです。
 正しいトークンが提供されない場合、APIは `401 Unauthorized` を返します。
+
+#### `PUT /api/staff/flavors/{flavor}`
+
+各味の調理時間と一度に焼ける数（バッチサイズ）を設定します。
+
+- **パスパラメータ:**
+  - `flavor`: `tsubuan` | `custard` | `kurikinton`
+- **リクエストボディ:**
+
+  ```json
+  {
+    "cookingTimeMinutes": 10,
+    "quantityPerBatch": 8
+  }
+  ```
+
+- **レスポンス:** `200 OK` と更新された設定オブジェクト
 
 #### `GET /api/staff/orders`
 
@@ -167,7 +170,7 @@
 - **リクエストボディ:** (なし)
 - **レスポンス:** 更新された `Order` オブジェクト (statusが `cancelled` になる)
 
-#### `PUT /api/staff/orders/{id}/priority` (新規)
+#### `PUT /api/staff/orders/{id}/priority`
 
 既存の注文の優先度を更新します。
 
@@ -183,7 +186,7 @@
 
 - **レスポンス:** `200 OK` と更新された `Order` オブジェクト
 
-#### `PUT /api/staff/orders/{id}/notification` (新規)
+#### `PUT /api/staff/orders/{id}/notification`
 
 注文に通知先を登録します。
 

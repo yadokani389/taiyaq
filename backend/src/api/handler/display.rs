@@ -25,7 +25,16 @@ pub async fn get_display_orders(
         .filter(|o| o.status == OrderStatus::Cooking)
         .map(|o| DisplayOrder { id: o.id })
         .collect();
-    Json(DisplayOrdersResponse { ready, cooking })
+    let waiting = orders
+        .iter()
+        .filter(|o| o.status == OrderStatus::Waiting)
+        .map(|o| DisplayOrder { id: o.id })
+        .collect();
+    Json(DisplayOrdersResponse {
+        ready,
+        cooking,
+        waiting,
+    })
 }
 
 /// GET /api/orders/{id}
