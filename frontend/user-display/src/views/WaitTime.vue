@@ -2,7 +2,7 @@
 import { fetchApiWaitTimes } from '@/scripts/api';
 import type { WaitTimesResponse } from '@/types';
 import { ProgressSpinner } from 'primevue';
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 const waitTimes = ref<{
   tsubuan: number | null;
@@ -10,8 +10,16 @@ const waitTimes = ref<{
   kurikinton: number | null;
 }>();
 
+const intervalId = ref<number>();
 onMounted(async () => {
   waitTimes.value = (await fetchApiWaitTimes()).waitTimes;
+  intervalId.value = setInterval(async () => {
+    waitTimes.value = (await fetchApiWaitTimes()).waitTimes;
+  }, 60000);
+});
+
+onUnmounted(() => {
+  clearInterval(intervalId.value);
 });
 </script>
 
@@ -98,7 +106,7 @@ onMounted(async () => {
 
 .waitTimeCard span {
   font-weight: bold;
-  font-size: 85px;
+  font-size: 70px;
   vertical-align: middle;
   position: relative;
 }
@@ -108,6 +116,6 @@ onMounted(async () => {
   opacity: 0.6;
   font-size: 20px;
   right: -27px;
-  bottom: 40px;
+  bottom: 30px;
 }
 </style>
