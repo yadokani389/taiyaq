@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ordersApi, productionApi, flavorsApi } from './api'
+import { ordersApi, productionApi, flavorsApi, apiClient } from './api'
 import type { Order, Flavor } from './api/types'
 
 const currentView = ref<'order' | 'baking' | 'settings'>('order')
@@ -68,6 +68,31 @@ const filteredOrders = computed(() => {
   }
 
   return orders.value.filter((order) => activeFilters.includes(order.status))
+})
+
+const statusCounts = computed(() => {
+  const counts = {
+    waiting: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+    cooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+    waitingAndCooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+  }
+
+  orders.value.forEach((order) => {
+    if (order.status === 'waiting' || order.status === 'cooking') {
+      order.items.forEach((item) => {
+        const flavorName = getFlavorName(item.flavor)
+        const statusKey = order.status as 'waiting' | 'cooking'
+        if (counts[statusKey][flavorName] !== undefined) {
+          counts[statusKey][flavorName] += item.quantity
+        }
+        if (counts.waitingAndCooking[flavorName] !== undefined) {
+          counts.waitingAndCooking[flavorName] += item.quantity
+        }
+      })
+    }
+  })
+
+  return counts
 })
 
 const addOrder = () => {
@@ -258,20 +283,18 @@ const completeOrder = async (orderId: number) => {
 
 const saveAppSettings = () => {
   localStorage.setItem('app_base_url', appSettings.value.baseUrl)
-  localStorage.setItem('app_token', appSettings.value.token)
+  localStorage.setItem('staff_token', appSettings.value.token)
 
   // Update API client
-  import('./api/client.js').then(({ apiClient }) => {
-    apiClient.setBaseUrl(appSettings.value.baseUrl)
-    apiClient.setToken(appSettings.value.token)
-  })
+  apiClient.setBaseUrl(appSettings.value.baseUrl)
+  apiClient.setToken(appSettings.value.token)
 
   showAppSettings.value = false
 }
 
 const loadAppSettings = () => {
   const savedBaseUrl = localStorage.getItem('app_base_url')
-  const savedToken = localStorage.getItem('app_token')
+  const savedToken = localStorage.getItem('staff_token')
 
   if (savedBaseUrl) appSettings.value.baseUrl = savedBaseUrl
   if (savedToken) appSettings.value.token = savedToken
@@ -505,6 +528,62 @@ onMounted(() => {
           </div>
           <button @click="fetchOrders" class="refresh-btn">更新</button>
         </div>
+        <div class="status-summary">
+          <div class="status-group">
+            <h4>waiting</h4>
+            <div class="flavor-counts">
+              <span class="flavor-count">つぶあん: {{ statusCounts.waiting.つぶあん }}個</span>
+              <span class="flavor-count">カスタード: {{ statusCounts.waiting.カスタード }}個</span>
+              <span class="flavor-count">栗きんとん: {{ statusCounts.waiting.栗きんとん }}個</span>
+              <span class="flavor-count total"
+                >合計:
+                {{
+                  statusCounts.waiting.つぶあん +
+                  statusCounts.waiting.カスタード +
+                  statusCounts.waiting.栗きんとん
+                }}個</span
+              >
+            </div>
+          </div>
+          <div class="status-group">
+            <h4>cooking</h4>
+            <div class="flavor-counts">
+              <span class="flavor-count">つぶあん: {{ statusCounts.cooking.つぶあん }}個</span>
+              <span class="flavor-count">カスタード: {{ statusCounts.cooking.カスタード }}個</span>
+              <span class="flavor-count">栗きんとん: {{ statusCounts.cooking.栗きんとん }}個</span>
+              <span class="flavor-count total"
+                >合計:
+                {{
+                  statusCounts.cooking.つぶあん +
+                  statusCounts.cooking.カスタード +
+                  statusCounts.cooking.栗きんとん
+                }}個</span
+              >
+            </div>
+          </div>
+          <div class="status-group">
+            <h4>waiting+cooking</h4>
+            <div class="flavor-counts">
+              <span class="flavor-count"
+                >つぶあん: {{ statusCounts.waitingAndCooking.つぶあん }}個</span
+              >
+              <span class="flavor-count"
+                >カスタード: {{ statusCounts.waitingAndCooking.カスタード }}個</span
+              >
+              <span class="flavor-count"
+                >栗きんとん: {{ statusCounts.waitingAndCooking.栗きんとん }}個</span
+              >
+              <span class="flavor-count total"
+                >合計:
+                {{
+                  statusCounts.waitingAndCooking.つぶあん +
+                  statusCounts.waitingAndCooking.カスタード +
+                  statusCounts.waitingAndCooking.栗きんとん
+                }}個</span
+              >
+            </div>
+          </div>
+        </div>
         <div class="orders">
           <div v-if="orders.length === 0" class="no-orders">オーダーがありません</div>
           <div v-for="order in filteredOrders" :key="order.id" class="order-item">
@@ -538,7 +617,7 @@ onMounted(() => {
                 @click="completeOrder(order.id)"
                 class="action-btn complete-btn"
               >
-                完了
+                受け渡し完了
               </button>
             </div>
           </div>
@@ -1004,5 +1083,41 @@ onMounted(() => {
 
 .refresh-btn:hover {
   background: #2ecc71;
+}
+
+.status-summary {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 5px;
+  padding: 15px;
+  margin-bottom: 15px;
+  display: flex;
+  gap: 30px;
+}
+
+.status-group h4 {
+  margin: 0 0 10px 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.flavor-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.flavor-count {
+  color: #ccc;
+  font-size: 13px;
+}
+
+.flavor-count.total {
+  color: #fff;
+  font-weight: bold;
+  border-top: 1px solid #444;
+  padding-top: 5px;
+  margin-top: 5px;
 }
 </style>

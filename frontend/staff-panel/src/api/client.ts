@@ -28,7 +28,7 @@ class ApiClient {
   }
 
   private loadToken() {
-    this.token = localStorage.getItem('staff_token') || localStorage.getItem('app_token')
+    this.token = localStorage.getItem('staff_token')
   }
 
   private loadBaseUrl() {
