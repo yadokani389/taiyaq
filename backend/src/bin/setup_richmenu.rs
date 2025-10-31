@@ -91,7 +91,7 @@ fn create_rich_menu_areas() -> Vec<RichMenuArea> {
                 bot_sdk_line::messaging_api_line::models::PostbackAction {
                     r#type: None,
                     label: None,
-                    data: Some("action=show_help".to_string()),
+                    data: Some("action=show_waittime".to_string()),
                     display_text: None,
                     text: None,
                     input_option: None,

@@ -89,6 +89,12 @@ pub async fn handle_postback(
         return;
     }
 
+    // 待ち時間表示
+    if postback_data == "action=show_waittime" {
+        handle_show_waittime(registry, reply_token).await;
+        return;
+    }
+
     // その他の定型アクション
     let reply_text = get_static_reply_text(postback_data);
     send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
@@ -219,6 +225,14 @@ async fn handle_adding_notification(
         }
     }
 }
+
+/// 待ち時間を表示
+async fn handle_show_waittime(registry: &AppRegistry, reply_token: String) {
+    let wait_times = registry.get_current_wait_times().await;
+    let reply_text = format_wait_times(&wait_times);
+    send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
+}
+
 // ========== ヘルパー関数：メッセージフォーマット ==========
 
 /// OrderDetailsResponse をユーザー向けにフォーマット
@@ -250,6 +264,24 @@ fn format_order_details(details: &crate::api::model::OrderDetailsResponse) -> St
     )
 }
 
+/// 待ち時間をフォーマット
+fn format_wait_times(wait_times: &crate::api::model::WaitTimeResponse) -> String {
+    let mut lines = vec!["⏱️ 現在の待ち時間".to_string(), "".to_string()];
+
+    for (flavor, time) in &wait_times.wait_times {
+        let time_str = time.map_or("提供なし".to_string(), |t| {
+            if t == 0 {
+                "すぐに提供できます".to_string()
+            } else {
+                format!("約{}分", t)
+            }
+        });
+        lines.push(format!("【{}】\n{}", flavor, time_str));
+    }
+
+    lines.join("\n")
+}
+
 /// 静的な返信テキストを取得
 fn get_static_reply_text(postback_data: &str) -> String {
     match postback_data {
@@ -258,9 +290,6 @@ fn get_static_reply_text(postback_data: &str) -> String {
         }
         "action=show_menu" => {
             "🐟メニュー☆彡\n- つぶあん (200円)\n- カスタード (200円)\n- 栗きんとん (200円)".into()
-        }
-        "action=show_help" => {
-            "📖 HELP\n\n【よくある質問】\n\nQ. 操作方法がわからない\nA. 注文受付のスタッフにお声がけください。\n\n【使い方】\nリッチメニューから各機能を選択してください。".into()
         }
         _ => format!("不明な操作です: {}", postback_data),
     }
