@@ -9,7 +9,7 @@ const getBaseURL = () => {
 };
 
 export const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> => {
-  const response = await fetch(`${getBaseURL()}/orders/display`, {
+  const response = await fetch(`${getBaseURL()}/api/orders/display`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -22,7 +22,7 @@ export const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> =>
 };
 
 export const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdResponse> => {
-  const response = await fetch(`${getBaseURL()}/orders/${orderId}`, {
+  const response = await fetch(`${getBaseURL()}/api/orders/${orderId}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -35,7 +35,7 @@ export const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdRespons
 };
 
 export const fetchApiWaitTimes = async (): Promise<WaitTimesResponse> => {
-  const response = await fetch(`${getBaseURL()}/wait-times`, {
+  const response = await fetch(`${getBaseURL()}/api/wait-times`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
