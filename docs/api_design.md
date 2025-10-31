@@ -70,7 +70,12 @@
   ```json
   {
     "id": 105,
+    "items": [
+      { "flavor": "tsubuan", "quantity": 2 },
+      { "flavor": "custard", "quantity": 1 }
+    ],
     "status": "waiting", // 現在のステータス
+    "orderedAt": "2025-10-30T13:16:25.169400804Z",
     "estimatedWaitMinutes": 15 // 受け取り可能になるまでの推定時間(分)。ready, completedの場合はnull
   }
   ```
