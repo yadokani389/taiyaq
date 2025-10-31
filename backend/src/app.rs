@@ -38,7 +38,11 @@ impl AppRegistry {
     }
 
     pub async fn load_data(&self) -> anyhow::Result<()> {
-        let data_str = std::fs::read_to_string(Self::FILE_PATH)?;
+        let Ok(data_str) = std::fs::read_to_string(Self::FILE_PATH) else {
+            let data_str = serde_json::to_string_pretty(&Data::default())?;
+            std::fs::write(Self::FILE_PATH, data_str)?;
+            return Ok(());
+        };
         let data: Data = serde_json::from_str(&data_str)?;
         *self.data.write().await = data;
         Ok(())

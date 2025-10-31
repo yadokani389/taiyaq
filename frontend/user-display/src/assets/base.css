@@ -1,0 +1,43 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Inter", "Helvetica", "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
+  font-size: 17px;
+  line-height: 1.8em;
+}
+
+:where(h1) {
+  font-size: 30px;
+}
+
+:where(h2) {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+:where(h3) {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+:where(body) {
+  background-color: #e5e5e5;
+  color: #333333;
+}
+
+:where(input, button, textarea, select) {
+  font: inherit;
+}
+
+:where(img) {
+  max-width: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+:where(a) {
+  text-decoration: none;
+  color: inherit;
+}
