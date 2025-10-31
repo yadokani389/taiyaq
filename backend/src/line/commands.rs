@@ -7,11 +7,9 @@ use bot_sdk_line::messaging_api_line::{
 };
 
 use crate::{
-    api::model::AddNotificationRequest,
     app::AppRegistry,
-    data::{NotifyChannel, OrderStatus},
+    data::{Notify, OrderStatus},
 };
-
 // ========== 公開API: イベントハンドラー ==========
 
 /// コマンドを処理
@@ -131,10 +129,7 @@ async fn handle_notification_confirm(
         return;
     };
 
-    let payload = AddNotificationRequest {
-        channel: NotifyChannel::Line,
-        target: user_id,
-    };
+    let payload = Notify::Line { user_id };
 
     if registry.add_notification(order_id, payload).await.is_some() {
         let buttons_template = create_notification_success_template(order_id);

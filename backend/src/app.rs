@@ -2,19 +2,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
-use bot_sdk_line::messaging_api_line::{
-    apis::MessagingApiApi,
-    models::{Message, PushMessageRequest, TextMessageV2},
-};
 use chrono::Utc;
 use enum_map::EnumMap;
 use poise::serenity_prelude::Context;
 use strum::IntoEnumIterator;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
-use crate::api::model::{AddNotificationRequest, OrderDetailsResponse, WaitTimeResponse};
-use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, NotifyChannel, Order, OrderStatus};
-use crate::discord;
+use crate::api::model::{OrderDetailsResponse, WaitTimeResponse};
+use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, Order, OrderStatus};
+use crate::{discord, line};
 
 // AppRegistry is the main application state.
 #[derive(Clone)]
@@ -287,17 +283,10 @@ impl AppRegistry {
         Some(updated_order)
     }
 
-    pub async fn add_notification(
-        &self,
-        id: u32,
-        payload: AddNotificationRequest,
-    ) -> Option<Order> {
+    pub async fn add_notification(&self, id: u32, payload: Notify) -> Option<Order> {
         let mut data = self.data.write().await;
         let order = data.orders.iter_mut().find(|o| o.id == id)?;
-        order.notify.insert(Notify {
-            channel: payload.channel,
-            target: payload.target,
-        });
+        order.notify.insert(payload);
         let order = order.clone();
         drop(data);
         self.save_data().await.ok();
@@ -307,49 +296,25 @@ impl AppRegistry {
     pub async fn send_notification(&self, order_id: u32, notify: &Notify, message: String) {
         // TODO: This is a placeholder.
         println!(
-            "Sending notification for Order ID: {}, Channel: {:?}, Target: {}, Message: {}",
-            order_id, notify.channel, notify.target, message
+            "Sending notification for Order ID: {}, Target: {:?}, Message: {}",
+            order_id, notify, message
         );
 
-        match notify.channel {
-            NotifyChannel::Discord => {
+        match notify {
+            Notify::Discord {
+                channel_id,
+                user_id,
+            } => {
                 let ctx = self.discord_ctx.lock().await;
-                let user_id: u64 = notify.target.parse().unwrap_or(0);
-                if user_id != 0 {
-                    discord::send_dm(&ctx, user_id, &message).await.ok();
+                if *user_id != 0 {
+                    discord::send_notification(&ctx, *channel_id, *user_id, &message)
+                        .await
+                        .ok();
                 }
             }
-            NotifyChannel::Line => {
+            Notify::Line { user_id } => {
                 let line = self.line.lock().await;
-                let push_request = PushMessageRequest {
-                    to: notify.target.clone(), // LINE user_id
-                    messages: vec![Message::TextMessageV2(TextMessageV2 {
-                        r#type: None,
-                        quick_reply: None,
-                        sender: None,
-                        text: message.clone(),
-                        substitution: None,
-                        quote_token: None,
-                    })],
-                    notification_disabled: Some(false),
-                    custom_aggregation_units: None,
-                };
-
-                match line
-                    .messaging_api_client
-                    .push_message(push_request, None)
-                    .await
-                {
-                    Ok(_) => {
-                        println!("✅ LINE notification sent to user {}", notify.target);
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Failed to send LINE notification to {}: {:?}",
-                            notify.target, e
-                        );
-                    }
-                }
+                line::send_notification(line, user_id.clone(), message).await;
             }
         }
     }

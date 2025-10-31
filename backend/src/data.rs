@@ -94,14 +94,7 @@ pub enum OrderStatus {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Notify {
-    pub channel: NotifyChannel,
-    pub target: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-#[serde(rename_all = "camelCase")]
-pub enum NotifyChannel {
-    Discord,
-    Line,
+pub enum Notify {
+    Discord { channel_id: u64, user_id: u64 },
+    Line { user_id: String },
 }

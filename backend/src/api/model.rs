@@ -1,4 +1,4 @@
-use crate::data::{Flavor, Item, NotifyChannel, OrderStatus};
+use crate::data::{Flavor, Item, OrderStatus};
 use chrono::{DateTime, Utc};
 use enum_map::EnumMap;
 use serde::{Deserialize, Serialize};
@@ -15,12 +15,6 @@ pub struct CreateOrderRequest {
 #[derive(Deserialize)]
 pub struct UpdateProductionRequest {
     pub items: Vec<Item>,
-}
-
-#[derive(Deserialize)]
-pub struct AddNotificationRequest {
-    pub channel: NotifyChannel,
-    pub target: String,
 }
 
 #[derive(Deserialize)]

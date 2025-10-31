@@ -7,13 +7,12 @@ use enum_map::EnumMap;
 
 use crate::{
     api::model::{
-        AddNotificationRequest, CreateOrderRequest, StaffOrdersQuery, UpdateOrderPriorityRequest,
-        UpdateProductionRequest, UpdateProductionResponse,
+        CreateOrderRequest, StaffOrdersQuery, UpdateOrderPriorityRequest, UpdateProductionRequest,
+        UpdateProductionResponse,
     },
     app::AppRegistry,
-    data::{Flavor, FlavorConfig, Order},
+    data::{Flavor, FlavorConfig, Notify, Order},
 };
-
 /// GET /api/staff/orders
 pub async fn get_staff_orders(
     State(registry): State<AppRegistry>,
@@ -106,7 +105,7 @@ pub async fn update_order_priority(
 pub async fn add_notification(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
-    Json(payload): Json<AddNotificationRequest>,
+    Json(payload): Json<Notify>,
 ) -> Result<Json<Order>, StatusCode> {
     if let Some(order) = registry.add_notification(id, payload).await {
         Ok(Json(order))
@@ -114,7 +113,6 @@ pub async fn add_notification(
         Err(StatusCode::NOT_FOUND)
     }
 }
-
 /// GET /api/staff/flavors/config
 pub async fn get_flavor_configs(
     State(registry): State<AppRegistry>,

@@ -1,8 +1,8 @@
 use poise::serenity_prelude::*;
 
 use crate::{
-    api::model::AddNotificationRequest,
-    data::{Flavor, FlavorConfig, Item, NotifyChannel, OrderStatus},
+    data::{Flavor, FlavorConfig, Item, Notify, OrderStatus},
+    discord::CREATE_CHANNEL,
 };
 
 use super::PoiseContext;
@@ -177,9 +177,9 @@ async fn notify(
         Some(press) => {
             press.defer(ctx).await?;
             let (description, color) = if press.data.custom_id == custom_id_confirm {
-                let payload = AddNotificationRequest {
-                    channel: NotifyChannel::Discord,
-                    target: ctx.author().id.to_string(),
+                let payload = Notify::Discord {
+                    channel_id: ctx.channel_id().into(),
+                    user_id: ctx.author().id.into(),
                 };
                 if registry.add_notification(id, payload).await.is_some() {
                     (
@@ -550,5 +550,34 @@ async fn set_flavor_config(
     ctx.data().set_flavor_config(flavor, config).await;
     ctx.say(format!("`{}` の設定を更新しました。", flavor))
         .await?;
+    Ok(())
+}
+
+/// チャンネルを作るボタンを作成します
+#[poise::command(slash_command, required_permissions = "MANAGE_GUILD")]
+pub async fn create_channel_button(
+    ctx: PoiseContext<'_>,
+    #[description = "カテゴリーID"] category_id: String,
+) -> Result<(), anyhow::Error> {
+    let custom_id = format!("{}_{}", CREATE_CHANNEL, category_id);
+    let button = CreateButton::new(custom_id)
+        .label("専用チャンネルを作成")
+        .style(ButtonStyle::Primary);
+    let action_row = CreateActionRow::Buttons(vec![button]);
+    let builder = CreateMessage::default()
+        .content("以下のボタンを押して専用チャンネルを作成してください。")
+        .components(vec![action_row]);
+    ctx.channel_id().send_message(ctx, builder).await?;
+
+    ctx.send(
+        poise::CreateReply::default()
+            .embed(
+                CreateEmbed::default()
+                    .title("パネルをデプロイしました")
+                    .color(Color::DARK_GREEN),
+            )
+            .ephemeral(true),
+    )
+    .await?;
     Ok(())
 }
