@@ -70,24 +70,30 @@ const filteredOrders = computed(() => {
   return orders.value.filter((order) => activeFilters.includes(order.status))
 })
 
+// 追加: 日本語キーの型と flavor コード -> 日本語キー のマッピング
+type FlavorCounts = { つぶあん: number; カスタード: number; 栗きんとん: number }
+const flavorCodeToJP: Record<Flavor, keyof FlavorCounts> = {
+  tsubuan: 'つぶあん',
+  custard: 'カスタード',
+  kurikinton: '栗きんとん',
+}
+
 const statusCounts = computed(() => {
-  const counts = {
-    waiting: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
-    cooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
-    waitingAndCooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
-  }
+  // 明確な型を付与
+  const counts: { waiting: FlavorCounts; cooking: FlavorCounts; waitingAndCooking: FlavorCounts } =
+    {
+      waiting: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+      cooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+      waitingAndCooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+    }
 
   orders.value.forEach((order) => {
     if (order.status === 'waiting' || order.status === 'cooking') {
       order.items.forEach((item) => {
-        const flavorName = getFlavorName(item.flavor)
+        const flavorName = flavorCodeToJP[item.flavor] as keyof FlavorCounts
         const statusKey = order.status as 'waiting' | 'cooking'
-        if (counts[statusKey][flavorName] !== undefined) {
-          counts[statusKey][flavorName] += item.quantity
-        }
-        if (counts.waitingAndCooking[flavorName] !== undefined) {
-          counts.waitingAndCooking[flavorName] += item.quantity
-        }
+        counts[statusKey][flavorName] += item.quantity
+        counts.waitingAndCooking[flavorName] += item.quantity
       })
     }
   })
@@ -143,7 +149,7 @@ const submitOrder = async () => {
   }
 
   if (items.length === 0) {
-    alert('少なくとも1つの味を選択してください')
+    alert('少なくとも1つの数量を選択してください')
     return
   }
 
@@ -282,10 +288,7 @@ const completeOrder = async (orderId: number) => {
 }
 
 const saveAppSettings = () => {
-  localStorage.setItem('app_base_url', appSettings.value.baseUrl)
-  localStorage.setItem('staff_token', appSettings.value.token)
-
-  // Update API client
+  // Update API client (handles localStorage persistence)
   apiClient.setBaseUrl(appSettings.value.baseUrl)
   apiClient.setToken(appSettings.value.token)
 
@@ -293,11 +296,9 @@ const saveAppSettings = () => {
 }
 
 const loadAppSettings = () => {
-  const savedBaseUrl = localStorage.getItem('app_base_url')
-  const savedToken = localStorage.getItem('staff_token')
-
-  if (savedBaseUrl) appSettings.value.baseUrl = savedBaseUrl
-  if (savedToken) appSettings.value.token = savedToken
+  // Get values from ApiClient (single source of truth)
+  appSettings.value.baseUrl = apiClient.getBaseUrl()
+  appSettings.value.token = apiClient.getToken() || ''
 }
 
 const fetchOrders = async () => {

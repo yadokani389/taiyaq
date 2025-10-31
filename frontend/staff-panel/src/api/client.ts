@@ -6,8 +6,8 @@ class ApiClient {
   private baseUrl: string
   private token: string | null = null
 
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl
+  constructor() {
+    this.baseUrl = API_BASE_URL
     this.loadToken()
     this.loadBaseUrl()
   }
@@ -25,6 +25,14 @@ class ApiClient {
   setBaseUrl(baseUrl: string) {
     this.baseUrl = baseUrl
     localStorage.setItem('app_base_url', baseUrl)
+  }
+
+  getToken(): string | null {
+    return this.token
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl
   }
 
   private loadToken() {
