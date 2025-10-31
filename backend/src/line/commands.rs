@@ -69,15 +69,10 @@ pub async fn handle_postback(
     }
 
     // 通知登録キャンセル
-    if postback_data.starts_with("notify_cancel_") {
-        send_reply(
-            registry,
-            reply_token,
-            vec![create_text_message(
-                "通知の登録をキャンセルしました。".to_string(),
-            )],
-        )
-        .await;
+    if let Some(order_id_str) = postback_data.strip_prefix("notify_cancel_")
+        && let Ok(order_id) = order_id_str.parse::<u32>()
+    {
+        handle_notification_cancel(registry, reply_token, order_id, user_id).await;
         return;
     }
 
@@ -151,6 +146,53 @@ async fn handle_notification_confirm(
             )],
         )
         .await;
+    }
+}
+
+/// 通知登録キャンセルを処理
+async fn handle_notification_cancel(
+    registry: &AppRegistry,
+    reply_token: String,
+    order_id: u32,
+    user_id: Option<String>,
+) {
+    let Some(user_id) = user_id else {
+        send_reply(
+            registry,
+            reply_token,
+            vec![create_text_message(
+                "❌ ユーザー情報の取得に失敗しました。".to_string(),
+            )],
+        )
+        .await;
+        return;
+    };
+
+    let payload = Notify::Line { user_id };
+
+    match registry.cancel_notification(order_id, &payload).await {
+        Some(_) => {
+            send_reply(
+                registry,
+                reply_token,
+                vec![create_text_message(format!(
+                    "✅ 注文 #{} の通知登録をキャンセルしました。",
+                    order_id
+                ))],
+            )
+            .await;
+        }
+        None => {
+            send_reply(
+                registry,
+                reply_token,
+                vec![create_text_message(format!(
+                    "❌ 注文 #{} が見つかりませんでした。",
+                    order_id
+                ))],
+            )
+            .await;
+        }
     }
 }
 
