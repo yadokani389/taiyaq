@@ -44,6 +44,14 @@
             cargo = rust-toolchain;
             rustc = rust-toolchain;
           };
+
+          backup = pkgs.writeShellScriptBin "backup" ''
+            mkdir -p backups
+            while true; do
+              cp data.json backups/data_$(date +%Y%m%d_%H%M).json
+              sleep 600
+            done
+          '';
         in
         rec {
           _module.args.pkgs = import nixpkgs {
@@ -113,13 +121,10 @@
             settings = {
               processes = {
                 backend-server.command = lib.getExe config.packages.taiyaq-backend;
-                staff-panel.command = "${lib.getExe pkgs.nodePackages.serve} -s frontend/staff-panel/dist -l 38001";
-                display-screen.command = "${lib.getExe pkgs.nodePackages.serve} -s frontend/display-screen/dist -l 38002";
-                user-display.command = "${lib.getExe pkgs.nodePackages.serve} -s frontend/user-display/dist -l 38003";
+                backup.command = lib.getExe backup;
               };
             };
           };
-
         };
     };
 }

@@ -8,8 +8,6 @@ pub async fn line_callback(
     State(registry): State<AppRegistry>,
     Json(req): Json<CallbackRequest>,
 ) -> StatusCode {
-    println!("req: {req:#?}");
-
     match handler::line_handler(&registry, req).await {
         Ok(_) => StatusCode::OK,
         Err(status) => status,
