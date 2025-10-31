@@ -16,3 +16,11 @@ export type OrdersIdResponse = {
   orderedAt: string,
   estimatedWaitMinutes: number,
 }
+
+export type WaitTimesResponse = {
+  waitTimes: {
+    tsubuan: number | null,
+    custard: number | null,
+    kurikinton: number | null,
+  },
+}

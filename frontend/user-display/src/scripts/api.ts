@@ -1,4 +1,4 @@
-import type { OrdersDisplayResponse, OrdersIdResponse } from "@/types";
+import type { OrdersDisplayResponse, OrdersIdResponse, WaitTimesResponse } from "@/types";
 
 const getBaseURL = () => {
   const baseURL = import.meta.env.VITE_API_BASE_URL
@@ -8,7 +8,7 @@ const getBaseURL = () => {
   return baseURL.replace(/\/+$/, '')
 };
 
-const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> => {
+export const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> => {
   const response = await fetch(`${getBaseURL()}/orders/display`, {
     method: 'GET',
     headers: {
@@ -21,7 +21,7 @@ const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> => {
   return await response.json();
 };
 
-const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdResponse> => {
+export const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdResponse> => {
   const response = await fetch(`${getBaseURL()}/orders/${orderId}`, {
     method: 'GET',
     headers: {
@@ -34,4 +34,15 @@ const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdResponse> => {
   return await response.json();
 };
 
-export { fetchApiOrdersDisplay, fetchApiOrdersId }
+export const fetchApiWaitTimes = async (): Promise<WaitTimesResponse> => {
+  const response = await fetch(`${getBaseURL()}/wait-times`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Error fetching wait times: ${response.statusText}`);
+  }
+  return await response.json();
+}
