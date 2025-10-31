@@ -444,6 +444,7 @@ impl AppRegistry {
     pub async fn set_flavor_config(&self, flavor: Flavor, config: FlavorConfig) {
         let mut data = self.data.write().await;
         data.flavor_configs[flavor] = config;
+        self.update_order_statuses(&mut data).await;
         drop(data);
         self.save_data().await.ok();
     }
