@@ -80,10 +80,9 @@ const cookingTrack = computed(() => {
 })
 
 // スクロール速度（項目数に応じて duration を増やす）
-const readyDuration = computed(() => `${Math.max(8, (displayData.value.ready.length || 1) * 1.2)}s`)
+const readyDuration = computed(() => `${(displayData.value.ready.length || 1) * 2.5}s`)
 const cookingDuration = computed(
-  () =>
-    `${Math.max(8, (displayData.value.cooking.length + displayData.value.waiting.length || 1) * 1.2)}s`,
+  () => `${(displayData.value.cooking.length + displayData.value.waiting.length || 1) * 2.5}s`,
 )
 
 onMounted(() => {
@@ -139,7 +138,7 @@ onUnmounted(() => {
       </div>
 
       <div class="cooking-section">
-        <h2>調理中</h2>
+        <h2>準備中</h2>
         <div
           v-if="displayData.cooking.length === 0 && displayData.waiting.length === 0"
           class="no-orders"
