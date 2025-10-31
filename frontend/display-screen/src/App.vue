@@ -7,7 +7,7 @@ const displayData = ref<DisplayResponse>({ ready: [], cooking: [], waiting: [] }
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
-let intervalId: number | null = null
+let intervalId: number | undefined = undefined
 
 function fetchData() {
   error.value = null
@@ -37,14 +37,15 @@ const readyTrack = computed(() => {
   return readyScrolling.value && arr.length > 0 ? [...arr, ...arr] : arr
 })
 const cookingTrack = computed(() => {
-  const arr = [...(displayData.value.cooking || []), ...(displayData.value.waiting || [])]
+  const arr = [...displayData.value.cooking, ...displayData.value.waiting]
   return cookingScrolling.value && arr.length > 0 ? [...arr, ...arr] : arr
 })
 
 // スクロール速度（項目数に応じて duration を増やす）
 const readyDuration = computed(() => `${Math.max(8, (displayData.value.ready.length || 1) * 1.2)}s`)
 const cookingDuration = computed(
-  () => `${Math.max(8, (displayData.value.cooking.length || 1) * 1.2)}s`,
+  () =>
+    `${Math.max(8, (displayData.value.cooking.length + displayData.value.waiting.length || 1) * 1.2)}s`,
 )
 
 onMounted(() => {
@@ -91,7 +92,12 @@ onUnmounted(() => {
 
       <div class="cooking-section">
         <h2>調理中</h2>
-        <div v-if="displayData.cooking.length === 0" class="no-orders">なし</div>
+        <div
+          v-if="displayData.cooking.length === 0 && displayData.waiting.length === 0"
+          class="no-orders"
+        >
+          なし
+        </div>
         <div
           v-else
           class="order-numbers-viewport"
@@ -121,7 +127,8 @@ onUnmounted(() => {
   text-align: center;
   font-family: system-ui, sans-serif;
   box-sizing: border-box;
-  min-height: 100vh; /* 画面全体に収める */
+  min-height: 100vh;
+  /* 画面全体に収める */
   display: flex;
   flex-direction: column;
 }
@@ -156,7 +163,8 @@ h2 {
   gap: 1.5rem;
   align-items: stretch;
   flex: 1 1 auto;
-  overflow: hidden; /* 外側で余分なスクロールを作らない */
+  overflow: hidden;
+  /* 外側で余分なスクロールを作らない */
 }
 
 /* 各セクションを横に広げる。min-width:0 で flex 内で正しく縮む */
@@ -197,7 +205,8 @@ h2 {
 /* スクロール領域（トラック） */
 .scroll-track {
   display: flex;
-  flex-direction: column; /* 縦に並べる */
+  flex-direction: column;
+  /* 縦に並べる */
   gap: 0.5rem;
   align-items: stretch;
   will-change: transform;
@@ -213,6 +222,7 @@ h2 {
   from {
     transform: translateY(0);
   }
+
   to {
     transform: translateY(-50%);
   }
@@ -255,6 +265,7 @@ h2 {
     gap: 1rem;
     align-items: stretch;
   }
+
   .order-number {
     font-size: clamp(1.8rem, 6.5vw, 3rem);
     padding: 0.5rem 0.8rem;
