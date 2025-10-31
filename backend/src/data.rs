@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
@@ -35,7 +35,7 @@ pub struct FlavorConfig {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Data {
     pub orders: Vec<Order>,
-    pub unallocated_stock: HashMap<Flavor, usize>,
+    pub unallocated_stock: EnumMap<Flavor, usize>,
     pub flavor_configs: EnumMap<Flavor, FlavorConfig>,
 }
 
@@ -57,7 +57,7 @@ impl Default for Data {
         };
         Self {
             orders: Vec::new(),
-            unallocated_stock: HashMap::new(),
+            unallocated_stock: EnumMap::from_fn(|_| 0),
             flavor_configs,
         }
     }
@@ -72,7 +72,7 @@ pub struct Order {
     pub ordered_at: DateTime<Utc>,
     pub ready_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
-    pub notify: Vec<Notify>,
+    pub notify: HashSet<Notify>,
     pub is_priority: bool,
 }
 
@@ -93,15 +93,8 @@ pub enum OrderStatus {
     Cancelled,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Notify {
-    pub channel: NotifyChannel,
-    pub target: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum NotifyChannel {
-    Discord,
-    Line,
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Notify {
+    Discord { channel_id: u64, user_id: u64 },
+    Line { user_id: String },
 }

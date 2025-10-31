@@ -70,7 +70,12 @@
   ```json
   {
     "id": 105,
+    "items": [
+      { "flavor": "tsubuan", "quantity": 2 },
+      { "flavor": "custard", "quantity": 1 }
+    ],
     "status": "waiting", // 現在のステータス
+    "orderedAt": "2025-10-30T13:16:25.169400804Z",
     "estimatedWaitMinutes": 15 // 受け取り可能になるまでの推定時間(分)。ready, completedの場合はnull
   }
   ```
@@ -150,6 +155,20 @@
 - **クエリパラメータ (任意):**
   - `status`: `waiting` や `cooking` など、ステータスで絞り込み可能 (例: `?status=waiting,cooking`)
 - **レスポンス:** `[Order]` (Orderオブジェクトの配列)
+
+#### `GET /api/staff/stock`
+
+現在の未割り当ての在庫数を取得します。
+
+- **レスポンス:**
+
+  ```json
+  {
+    "tsubuan": 10,
+    "custard": 5,
+    "kurikinton": 0
+  }
+  ```
 
 #### `POST /api/staff/orders`
 

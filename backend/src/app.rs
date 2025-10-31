@@ -2,19 +2,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
-use bot_sdk_line::messaging_api_line::{
-    apis::MessagingApiApi,
-    models::{Message, PushMessageRequest, TextMessageV2},
-};
 use chrono::Utc;
 use enum_map::EnumMap;
 use poise::serenity_prelude::Context;
 use strum::IntoEnumIterator;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
-use crate::api::model::{AddNotificationRequest, OrderDetailsResponse, WaitTimeResponse};
-use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, NotifyChannel, Order, OrderStatus};
-use crate::discord;
+use crate::api::model::{OrderDetailsResponse, WaitTimeResponse};
+use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, Order, OrderStatus};
+use crate::{discord, line};
 
 // AppRegistry is the main application state.
 #[derive(Clone)]
@@ -118,11 +114,7 @@ impl AppRegistry {
 
             for item in &order.items {
                 let demand_so_far = cumulative_demand.get(&item.flavor).copied().unwrap_or(0);
-                let current_stock = data
-                    .unallocated_stock
-                    .get(&item.flavor)
-                    .copied()
-                    .unwrap_or(0);
+                let current_stock = data.unallocated_stock[item.flavor];
 
                 // How many items need to be produced to fulfill demand up to this point (including current item)
                 let total_demand_for_item = demand_so_far + item.quantity;
@@ -166,7 +158,7 @@ impl AppRegistry {
             ordered_at: Utc::now(),
             ready_at: None,
             completed_at: None,
-            notify: vec![],
+            notify: Default::default(),
             is_priority,
         };
         data.orders.push(new_order);
@@ -188,7 +180,7 @@ impl AppRegistry {
 
         // Add new production to stock
         for item in production {
-            *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
+            data.unallocated_stock[item.flavor] += item.quantity;
         }
 
         // Recalculate statuses
@@ -199,10 +191,7 @@ impl AppRegistry {
             .unallocated_stock
             .iter()
             .filter(|&(_, &quantity)| quantity > 0)
-            .map(|(flavor, &quantity)| Item {
-                flavor: *flavor,
-                quantity,
-            })
+            .map(|(flavor, &quantity)| Item { flavor, quantity })
             .collect();
 
         drop(data);
@@ -211,19 +200,17 @@ impl AppRegistry {
     }
 
     // Helper to check if an order can be fulfilled from stock
-    fn can_fulfill(order: &Order, stock: &HashMap<Flavor, usize>) -> bool {
+    fn can_fulfill(order: &Order, stock: &EnumMap<Flavor, usize>) -> bool {
         order
             .items
             .iter()
-            .all(|item| stock.get(&item.flavor).unwrap_or(&0) >= &item.quantity)
+            .all(|item| stock[item.flavor] >= item.quantity)
     }
 
     // Helper to decrement stock for a fulfilled order
-    fn fulfill(order: &Order, stock: &mut HashMap<Flavor, usize>) {
+    fn fulfill(order: &Order, stock: &mut EnumMap<Flavor, usize>) {
         for item in &order.items {
-            if let Some(stock_qty) = stock.get_mut(&item.flavor) {
-                *stock_qty -= item.quantity;
-            }
+            stock[item.flavor] -= item.quantity;
         }
     }
 
@@ -258,7 +245,7 @@ impl AppRegistry {
         let stock_was_changed = if let Some(items) = items_to_return {
             // Now we can mutably borrow `data.unallocated_stock` because the borrow for `items` is gone
             for item in items {
-                *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
+                data.unallocated_stock[item.flavor] += item.quantity;
             }
             true
         } else {
@@ -296,17 +283,10 @@ impl AppRegistry {
         Some(updated_order)
     }
 
-    pub async fn add_notification(
-        &self,
-        id: u32,
-        payload: AddNotificationRequest,
-    ) -> Option<Order> {
+    pub async fn add_notification(&self, id: u32, payload: Notify) -> Option<Order> {
         let mut data = self.data.write().await;
         let order = data.orders.iter_mut().find(|o| o.id == id)?;
-        order.notify.push(Notify {
-            channel: payload.channel,
-            target: payload.target,
-        });
+        order.notify.insert(payload);
         let order = order.clone();
         drop(data);
         self.save_data().await.ok();
@@ -316,49 +296,25 @@ impl AppRegistry {
     pub async fn send_notification(&self, order_id: u32, notify: &Notify, message: String) {
         // TODO: This is a placeholder.
         println!(
-            "Sending notification for Order ID: {}, Channel: {:?}, Target: {}, Message: {}",
-            order_id, notify.channel, notify.target, message
+            "Sending notification for Order ID: {}, Target: {:?}, Message: {}",
+            order_id, notify, message
         );
 
-        match notify.channel {
-            NotifyChannel::Discord => {
+        match notify {
+            Notify::Discord {
+                channel_id,
+                user_id,
+            } => {
                 let ctx = self.discord_ctx.lock().await;
-                let user_id: u64 = notify.target.parse().unwrap_or(0);
-                if user_id != 0 {
-                    discord::send_dm(&ctx, user_id, &message).await.ok();
+                if *user_id != 0 {
+                    discord::send_notification(&ctx, *channel_id, *user_id, &message)
+                        .await
+                        .ok();
                 }
             }
-            NotifyChannel::Line => {
+            Notify::Line { user_id } => {
                 let line = self.line.lock().await;
-                let push_request = PushMessageRequest {
-                    to: notify.target.clone(), // LINE user_id
-                    messages: vec![Message::TextMessageV2(TextMessageV2 {
-                        r#type: None,
-                        quick_reply: None,
-                        sender: None,
-                        text: message.clone(),
-                        substitution: None,
-                        quote_token: None,
-                    })],
-                    notification_disabled: Some(false),
-                    custom_aggregation_units: None,
-                };
-
-                match line
-                    .messaging_api_client
-                    .push_message(push_request, None)
-                    .await
-                {
-                    Ok(_) => {
-                        println!("✅ LINE notification sent to user {}", notify.target);
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Failed to send LINE notification to {}: {:?}",
-                            notify.target, e
-                        );
-                    }
-                }
+                line::send_notification(line, user_id.clone(), message).await;
             }
         }
     }
@@ -388,11 +344,7 @@ impl AppRegistry {
                     .sum::<usize>();
 
                 // 2. Subtract available stock.
-                let stock_for_flavor = data
-                    .unallocated_stock
-                    .get(&flavor_to_calc)
-                    .copied()
-                    .unwrap_or(0);
+                let stock_for_flavor = data.unallocated_stock[flavor_to_calc];
                 let needed_from_production =
                     total_demand_for_flavor.saturating_sub(stock_for_flavor);
 
@@ -425,7 +377,9 @@ impl AppRegistry {
 
         Some(OrderDetailsResponse {
             id: order.id,
+            items: order.items.clone(),
             status: order.status,
+            ordered_at: order.ordered_at,
             estimated_wait_minutes,
         })
     }
@@ -449,7 +403,7 @@ impl AppRegistry {
             let total_demand = demand_before_me + 1;
 
             // 2. Subtract available stock.
-            let stock_for_flavor = data.unallocated_stock.get(&flavor).copied().unwrap_or(0);
+            let stock_for_flavor = data.unallocated_stock[flavor];
 
             let estimated_wait_minutes = if total_demand <= stock_for_flavor {
                 Some(0)

@@ -113,7 +113,18 @@ curl -X GET "${BASE_URL}/api/staff/orders?status=waiting" \
      -H "Authorization: Bearer ${STAFF_API_TOKEN}"
 ```
 
-## 4. スタッフAPI: 生産状況の更新
+## 4. スタッフAPI: 在庫の取得
+
+現在の未割り当ての在庫数を取得します。
+
+### `GET /api/staff/stock`
+
+```bash
+curl -X GET "${BASE_URL}/api/staff/stock" \
+     -H "Authorization: Bearer ${STAFF_API_TOKEN}"
+```
+
+## 5. スタッフAPI: 生産状況の更新
 
 焼き上がったたい焼きを報告します。これにより、十分な在庫があれば、待機中の注文が「ready」に移行するはずです。
 
@@ -135,7 +146,7 @@ curl -X POST "${BASE_URL}/api/staff/production" \
 _予想:
 注文1（つぶあん2個、カスタード1個）と注文2（つぶあん3個）は「ready」になるはずです。注文3（カスタード5個、栗きんとん1個）は、カスタードと栗きんとんが生産されていないため、「waiting」のままです。_
 
-## 5. ユーザー/ディスプレイAPI: 表示用注文の取得
+## 6. ユーザー/ディスプレイAPI: 表示用注文の取得
 
 どの注文が準備完了または調理中かを確認します。
 
@@ -147,7 +158,7 @@ curl -X GET "${BASE_URL}/api/orders/display"
 
 _予想: 注文1と2が`ready`リストに表示されるはずです。_
 
-## 6. ユーザー/ディスプレイAPI: 注文詳細の取得
+## 7. ユーザー/ディスプレイAPI: 注文詳細の取得
 
 特定の注文のステータスと推定待ち時間を確認します。
 
@@ -161,7 +172,7 @@ curl -X GET "${BASE_URL}/api/orders/1"
 curl -X GET "${BASE_URL}/api/orders/3"
 ```
 
-## 6-2. ユーザー/ディスプレイAPI: 待ち時間の取得
+## 7-2. ユーザー/ディスプレイAPI: 待ち時間の取得
 
 現在のフレーバーごとの待ち時間を取得します。
 
@@ -171,7 +182,7 @@ curl -X GET "${BASE_URL}/api/orders/3"
 curl -X GET "${BASE_URL}/api/wait-times"
 ```
 
-## 7. スタッフAPI: 注文への通知設定
+## 8. スタッフAPI: 注文への通知設定
 
 注文の通知先を設定します。
 
@@ -188,7 +199,7 @@ curl -X PUT "${BASE_URL}/api/staff/orders/3/notification" \
      }'
 ```
 
-## 8. スタッフAPI: 注文の完了
+## 9. スタッフAPI: 注文の完了
 
 注文を完了としてマークします。
 
@@ -200,7 +211,7 @@ curl -X POST "${BASE_URL}/api/staff/orders/1/complete" \
      -H "Authorization: Bearer ${STAFF_API_TOKEN}"
 ```
 
-## 9. スタッフAPI: 注文のキャンセル
+## 10. スタッフAPI: 注文のキャンセル
 
 注文をキャンセルします。
 
