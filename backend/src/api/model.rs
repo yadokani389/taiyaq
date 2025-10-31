@@ -1,4 +1,5 @@
 use crate::data::{Flavor, Item, NotifyChannel, OrderStatus};
+use chrono::{DateTime, Utc};
 use enum_map::EnumMap;
 use serde::{Deserialize, Serialize};
 
@@ -81,7 +82,9 @@ pub struct DisplayOrder {
 #[serde(rename_all = "camelCase")]
 pub struct OrderDetailsResponse {
     pub id: u32,
+    pub items: Vec<Item>,
     pub status: OrderStatus,
+    pub ordered_at: DateTime<Utc>,
     pub estimated_wait_minutes: Option<i64>,
 }
 

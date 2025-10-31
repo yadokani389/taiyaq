@@ -425,7 +425,9 @@ impl AppRegistry {
 
         Some(OrderDetailsResponse {
             id: order.id,
+            items: order.items.clone(),
             status: order.status,
+            ordered_at: order.ordered_at,
             estimated_wait_minutes,
         })
     }

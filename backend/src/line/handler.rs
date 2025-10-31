@@ -9,13 +9,10 @@ pub async fn line_handler(registry: &AppRegistry, req: CallbackRequest) -> Resul
         match e {
             // テキストメッセージの処理
             Event::MessageEvent(message_event) => {
+                let reply_token = message_event.reply_token.ok_or(StatusCode::BAD_REQUEST)?;
+                let user_id = extract_user_id(message_event.source);
+
                 if let MessageContent::TextMessageContent(text_message) = *message_event.message {
-                    let reply_token = message_event.reply_token.ok_or(StatusCode::BAD_REQUEST)?;
-                    let user_id = message_event.source.and_then(|source| match *source {
-                        Source::UserSource(user_source) => user_source.user_id,
-                        Source::GroupSource(group_source) => Some(group_source.group_id),
-                        Source::RoomSource(room_source) => Some(room_source.room_id),
-                    });
                     let user_message = text_message.text.trim();
 
                     // コマンド判定（先頭が「!」かどうか）
@@ -23,28 +20,32 @@ pub async fn line_handler(registry: &AppRegistry, req: CallbackRequest) -> Resul
                         commands::handle_command(registry, reply_token, user_message, user_id)
                             .await;
                     } else {
-                        let reply_text = "たいやきくんはダンスが上手！".to_string();
-                        commands::send_text_reply(registry, reply_token, reply_text).await;
+                        commands::handle_text_message(registry, reply_token, user_message).await;
                     }
                 }
             }
             // Postbackイベントの処理
             Event::PostbackEvent(postback_event) => {
                 let reply_token = postback_event.reply_token.ok_or(StatusCode::BAD_REQUEST)?;
-                let user_id = postback_event.source.and_then(|source| match *source {
-                    Source::UserSource(user_source) => user_source.user_id,
-                    Source::GroupSource(group_source) => Some(group_source.group_id),
-                    Source::RoomSource(room_source) => Some(room_source.room_id),
-                });
+                let user_id = extract_user_id(postback_event.source);
                 let postback_data = postback_event.postback.data.as_str();
 
                 commands::handle_postback(registry, reply_token, postback_data, user_id).await;
             }
             _ => {
-                println!("Unhandled event type");
+                println!("Unhandled event type: {:?}", e);
             }
         }
     }
 
     Ok(())
+}
+
+/// ソースからユーザーIDを抽出
+fn extract_user_id(source: Option<Box<Source>>) -> Option<String> {
+    source.and_then(|s| match *s {
+        Source::UserSource(user) => user.user_id,
+        Source::GroupSource(group) => Some(group.group_id),
+        Source::RoomSource(room) => Some(room.room_id),
+    })
 }
