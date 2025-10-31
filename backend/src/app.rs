@@ -293,6 +293,16 @@ impl AppRegistry {
         Some(order)
     }
 
+    pub async fn cancel_notification(&self, id: u32, payload: &Notify) -> Option<Order> {
+        let mut data = self.data.write().await;
+        let order = data.orders.iter_mut().find(|o| o.id == id)?;
+        order.notify.remove(payload);
+        let order = order.clone();
+        drop(data);
+        self.save_data().await.ok();
+        Some(order)
+    }
+
     pub async fn send_notification(&self, order_id: u32, notify: &Notify, message: String) {
         // TODO: This is a placeholder.
         println!(
