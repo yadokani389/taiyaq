@@ -250,4 +250,14 @@ const refresh = async () => {
 .orderCard.waiting {
   background-color: #ffcdd2;
 }
+
+@media screen and (min-width: 600px) {
+  .mainContainer {
+    flex-direction: row;
+  }
+
+  .ordersList {
+    flex: 1.5;
+  }
+}
 </style>
