@@ -30,6 +30,12 @@ export interface FlavorConfig {
   quantityPerBatch: number
 }
 
+export interface StockData {
+  tsubuan: number
+  custard: number
+  kurikinton: number
+}
+
 export interface CreateOrderRequest {
   items: Item[]
   isPriority?: boolean

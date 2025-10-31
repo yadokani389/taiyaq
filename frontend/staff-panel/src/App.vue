@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ordersApi, productionApi, flavorsApi, apiClient } from './api'
+import { ordersApi, productionApi, flavorsApi, stockApi, apiClient } from './api'
 import type { Order, Flavor } from './api/types'
 
 const currentView = ref<'order' | 'baking' | 'settings'>('order')
 const orders = ref<Order[]>([])
+const stockData = ref<{ つぶあん: number; カスタード: number; 栗きんとん: number }>({
+  つぶあん: 0,
+  カスタード: 0,
+  栗きんとん: 0,
+})
 
 const orderForm = ref({
   つぶあん: 0,
@@ -314,6 +319,33 @@ const fetchOrders = async () => {
   if (response.data) {
     orders.value = response.data
   }
+
+  await fetchStock()
+}
+
+const fetchStock = async () => {
+  console.log('Fetching stock data')
+  const response = await stockApi.getStock()
+  console.log('Fetch stock response:', response)
+
+  if (response.error) {
+    console.error(`在庫データの取得に失敗しました: ${response.error.message}`)
+    return
+  }
+
+  if (response.data) {
+    const flavorCodeToJP = {
+      tsubuan: 'つぶあん',
+      custard: 'カスタード',
+      kurikinton: '栗きんとん',
+    }
+
+    stockData.value = {
+      つぶあん: response.data.tsubuan,
+      カスタード: response.data.custard,
+      栗きんとん: response.data.kurikinton,
+    }
+  }
 }
 
 const getFlavorName = (flavor: string) => {
@@ -581,6 +613,18 @@ onMounted(() => {
                   statusCounts.waitingAndCooking.カスタード +
                   statusCounts.waitingAndCooking.栗きんとん
                 }}個</span
+              >
+            </div>
+          </div>
+          <div class="status-group">
+            <h4>stock</h4>
+            <div class="flavor-counts">
+              <span class="flavor-count">つぶあん: {{ stockData.つぶあん }}個</span>
+              <span class="flavor-count">カスタード: {{ stockData.カスタード }}個</span>
+              <span class="flavor-count">栗きんとん: {{ stockData.栗きんとん }}個</span>
+              <span class="flavor-count total"
+                >合計:
+                {{ stockData.つぶあん + stockData.カスタード + stockData.栗きんとん }}個</span
               >
             </div>
           </div>
