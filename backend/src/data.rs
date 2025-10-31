@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
@@ -35,7 +35,7 @@ pub struct FlavorConfig {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Data {
     pub orders: Vec<Order>,
-    pub unallocated_stock: HashMap<Flavor, usize>,
+    pub unallocated_stock: EnumMap<Flavor, usize>,
     pub flavor_configs: EnumMap<Flavor, FlavorConfig>,
 }
 
@@ -57,7 +57,7 @@ impl Default for Data {
         };
         Self {
             orders: Vec::new(),
-            unallocated_stock: HashMap::new(),
+            unallocated_stock: EnumMap::from_fn(|_| 0),
             flavor_configs,
         }
     }

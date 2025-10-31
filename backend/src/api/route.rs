@@ -3,8 +3,8 @@ use crate::{
         auth::staff_api_auth,
         handler::{
             add_notification, cancel_order, complete_order, create_order, get_display_orders,
-            get_flavor_configs, get_order_details, get_staff_orders, get_wait_times, line_callback,
-            set_flavor_config, update_order_priority, update_production,
+            get_flavor_configs, get_order_details, get_staff_orders, get_stock, get_wait_times,
+            line_callback, set_flavor_config, update_order_priority, update_production,
         },
     },
     app::AppRegistry,
@@ -20,6 +20,7 @@ pub fn routes() -> Router<AppRegistry> {
         .route("/wait-times", get(get_wait_times));
     let staff_routes = Router::new()
         .route("/staff/orders", get(get_staff_orders).post(create_order))
+        .route("/staff/stock", get(get_stock))
         .route("/staff/production", post(update_production))
         .route("/staff/orders/{id}/complete", post(complete_order))
         .route("/staff/orders/{id}/cancel", post(cancel_order))

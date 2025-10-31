@@ -118,11 +118,7 @@ impl AppRegistry {
 
             for item in &order.items {
                 let demand_so_far = cumulative_demand.get(&item.flavor).copied().unwrap_or(0);
-                let current_stock = data
-                    .unallocated_stock
-                    .get(&item.flavor)
-                    .copied()
-                    .unwrap_or(0);
+                let current_stock = data.unallocated_stock[item.flavor];
 
                 // How many items need to be produced to fulfill demand up to this point (including current item)
                 let total_demand_for_item = demand_so_far + item.quantity;
@@ -188,7 +184,7 @@ impl AppRegistry {
 
         // Add new production to stock
         for item in production {
-            *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
+            data.unallocated_stock[item.flavor] += item.quantity;
         }
 
         // Recalculate statuses
@@ -199,10 +195,7 @@ impl AppRegistry {
             .unallocated_stock
             .iter()
             .filter(|&(_, &quantity)| quantity > 0)
-            .map(|(flavor, &quantity)| Item {
-                flavor: *flavor,
-                quantity,
-            })
+            .map(|(flavor, &quantity)| Item { flavor, quantity })
             .collect();
 
         drop(data);
@@ -211,19 +204,17 @@ impl AppRegistry {
     }
 
     // Helper to check if an order can be fulfilled from stock
-    fn can_fulfill(order: &Order, stock: &HashMap<Flavor, usize>) -> bool {
+    fn can_fulfill(order: &Order, stock: &EnumMap<Flavor, usize>) -> bool {
         order
             .items
             .iter()
-            .all(|item| stock.get(&item.flavor).unwrap_or(&0) >= &item.quantity)
+            .all(|item| stock[item.flavor] >= item.quantity)
     }
 
     // Helper to decrement stock for a fulfilled order
-    fn fulfill(order: &Order, stock: &mut HashMap<Flavor, usize>) {
+    fn fulfill(order: &Order, stock: &mut EnumMap<Flavor, usize>) {
         for item in &order.items {
-            if let Some(stock_qty) = stock.get_mut(&item.flavor) {
-                *stock_qty -= item.quantity;
-            }
+            stock[item.flavor] -= item.quantity;
         }
     }
 
@@ -258,7 +249,7 @@ impl AppRegistry {
         let stock_was_changed = if let Some(items) = items_to_return {
             // Now we can mutably borrow `data.unallocated_stock` because the borrow for `items` is gone
             for item in items {
-                *data.unallocated_stock.entry(item.flavor).or_insert(0) += item.quantity;
+                data.unallocated_stock[item.flavor] += item.quantity;
             }
             true
         } else {
@@ -388,11 +379,7 @@ impl AppRegistry {
                     .sum::<usize>();
 
                 // 2. Subtract available stock.
-                let stock_for_flavor = data
-                    .unallocated_stock
-                    .get(&flavor_to_calc)
-                    .copied()
-                    .unwrap_or(0);
+                let stock_for_flavor = data.unallocated_stock[flavor_to_calc];
                 let needed_from_production =
                     total_demand_for_flavor.saturating_sub(stock_for_flavor);
 
@@ -451,7 +438,7 @@ impl AppRegistry {
             let total_demand = demand_before_me + 1;
 
             // 2. Subtract available stock.
-            let stock_for_flavor = data.unallocated_stock.get(&flavor).copied().unwrap_or(0);
+            let stock_for_flavor = data.unallocated_stock[flavor];
 
             let estimated_wait_minutes = if total_demand <= stock_for_flavor {
                 Some(0)

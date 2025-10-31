@@ -156,6 +156,20 @@
   - `status`: `waiting` や `cooking` など、ステータスで絞り込み可能 (例: `?status=waiting,cooking`)
 - **レスポンス:** `[Order]` (Orderオブジェクトの配列)
 
+#### `GET /api/staff/stock`
+
+現在の未割り当ての在庫数を取得します。
+
+- **レスポンス:**
+
+  ```json
+  {
+    "tsubuan": 10,
+    "custard": 5,
+    "kurikinton": 0
+  }
+  ```
+
 #### `POST /api/staff/orders`
 
 新しい注文を作成します。

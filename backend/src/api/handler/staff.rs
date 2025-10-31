@@ -44,6 +44,12 @@ pub async fn create_order(
     (StatusCode::CREATED, Json(new_order))
 }
 
+/// GET /api/staff/stock
+pub async fn get_stock(State(registry): State<AppRegistry>) -> Json<EnumMap<Flavor, usize>> {
+    let data = registry.data().await;
+    Json(data.unallocated_stock)
+}
+
 /// POST /api/staff/production
 pub async fn update_production(
     State(registry): State<AppRegistry>,
