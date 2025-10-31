@@ -187,7 +187,7 @@ async fn handle_notification_cancel(
                 registry,
                 reply_token,
                 vec![create_text_message(format!(
-                    "❌ 注文 {} が見つかりませんでした。",
+                    "❌ 注文 #{} が見つかりませんでした。",
                     order_id
                 ))],
             )
