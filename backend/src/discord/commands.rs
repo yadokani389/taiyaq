@@ -183,7 +183,7 @@ async fn notify(
                 };
                 if registry.add_notification(id, payload).await.is_some() {
                     (
-                        "通知を登録しました。準備ができたらDMでお知らせします。",
+                        "通知を登録しました。準備ができたらメンションでお知らせします。",
                         Colour::DARK_GREEN,
                     )
                 } else {
