@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, triggerRef } from 'vue';
+import { computed, onMounted, onUnmounted, ref, triggerRef } from 'vue';
 import { fetchApiOrdersDisplay, fetchApiOrdersId } from './scripts/api';
 import { computedAsync } from '@vueuse/core';
 import type { OrdersDisplayResponse } from './types';
@@ -18,12 +18,17 @@ const flattenedOrders = computed(() => {
 const orderId = ref<number>();
 const orderDetail = computedAsync(async () => {
   if (!orderId.value) return undefined;
-  return await fetchApiOrdersId(orderId.value!);
+  return await fetchApiOrdersId(orderId.value);
 }, undefined, { lazy: true });
 
+const intervalId = ref<number>();
 onMounted(async () => {
   orders.value = await fetchApiOrdersDisplay();
-  setInterval(refresh, 5000);
+  intervalId.value = setInterval(refresh, 5000);
+});
+
+onUnmounted(() => {
+  clearInterval(intervalId.value);
 });
 
 const refresh = async () => {
@@ -52,7 +57,7 @@ const refresh = async () => {
         <div v-else-if="orderDetail.status === 'cancelled'">キャンセル済み</div>
 
         <div :class="$style.orderedItems">
-          <div v-for="item in orderDetail.items" :class="[$style.itemCard, {
+          <div v-for="(item, index) in orderDetail.items" :key="index" :class="[$style.itemCard, {
             [$style.tsubuan]: item.flavor === 'tsubuan',
             [$style.custard]: item.flavor === 'custard',
             [$style.kurikinton]: item.flavor === 'kurikinton',
@@ -76,7 +81,7 @@ const refresh = async () => {
       </div>
     </div>
     <div :class="$style.ordersList">
-      <div v-for="order in flattenedOrders" :class="[$style.orderCard, {
+      <div v-for="order in flattenedOrders" :key="order.id" :class="[$style.orderCard, {
         [$style.cooking]: order.status === 'cooking',
         [$style.ready]: order.status === 'ready',
         [$style.waiting]: order.status === 'waiting',
@@ -174,23 +179,19 @@ const refresh = async () => {
   font-size: 20px;
   padding: 10px;
   background-color: #ffffff3b;
-  border: solid 1px;
   border-radius: 4px;
 }
 
 .itemCard.tsubuan {
-  background-color: #fff0eb;
-  border-color: #ffccbc;
+  background-color: #fcd7ca;
 }
 
 .itemCard.custard {
-  background-color: #fff9c4;
-  border-color: #dfd57c;
+  background-color: #f5eb96;
 }
 
 .itemCard.kurikinton {
   background-color: #ffe0b2;
-  border-color: #ffcc80;
 }
 
 .ordersList {
