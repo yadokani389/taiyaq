@@ -12,6 +12,8 @@ const drawerVisible = ref(false);
       <RouterLink to="/wait-time" @click.native="drawerVisible = false">現在の待ち時間</RouterLink>
       <a href="https://discord.gg/vnm55Yaccc">Discordで通知する</a>
       <a href="https://lin.ee/g5LYSDp">LINEで通知する</a>
+      <div :class="$style.spacer"></div>
+      <a href="https://github.com/yadokani389/taiyaq">TaiyaQ</a>
     </div>
   </Drawer>
   <Button :class="$style.button" icon="pi pi-bars" severity="secondary" variant="text" rounded
@@ -32,5 +34,10 @@ const drawerVisible = ref(false);
   flex-direction: column;
   gap: 15px;
   padding: 20px;
+  height: 100%;
+}
+
+.spacer {
+  flex: 1;
 }
 </style>
