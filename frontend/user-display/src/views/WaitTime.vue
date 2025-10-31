@@ -24,32 +24,42 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div :class="$style.container">
-    <h1>現在の待ち時間</h1>
-    <div v-if="waitTimes" :class="$style.waitTimesContainer">
-      <div :class="[$style.waitTimeCard, $style.tsubuan]">
-        <strong>つぶあん</strong>
-        <span v-if="waitTimes.tsubuan !== null">{{ waitTimes.tsubuan }} <span :class="$style.min">分</span></span>
-        <span v-else>現在提供不可</span>
+  <div :class="$style.background">
+    <div :class="$style.container">
+      <h1>現在の待ち時間</h1>
+      <div v-if="waitTimes" :class="$style.waitTimesContainer">
+        <div :class="[$style.waitTimeCard, $style.tsubuan]">
+          <strong>つぶあん</strong>
+          <span v-if="waitTimes.tsubuan !== null">{{ waitTimes.tsubuan }} <span :class="$style.min">分</span></span>
+          <span v-else>現在提供不可</span>
+        </div>
+        <div :class="[$style.waitTimeCard, $style.custard]">
+          <strong>カスタード</strong>
+          <span v-if="waitTimes.custard !== null">{{ waitTimes.custard }} <span :class="$style.min">分</span></span>
+          <span v-else>現在提供不可</span>
+        </div>
+        <div :class="[$style.waitTimeCard, $style.kurikinton]">
+          <strong>栗きんとん</strong>
+          <span v-if="waitTimes.kurikinton !== null">{{ waitTimes.kurikinton }} <span
+              :class="$style.min">分</span></span>
+          <span v-else>現在提供不可</span>
+        </div>
       </div>
-      <div :class="[$style.waitTimeCard, $style.custard]">
-        <strong>カスタード</strong>
-        <span v-if="waitTimes.custard !== null">{{ waitTimes.custard }} <span :class="$style.min">分</span></span>
-        <span v-else>現在提供不可</span>
+      <div v-else :class="$style.loadingContainer">
+        <ProgressSpinner stroke-width="5" />
       </div>
-      <div :class="[$style.waitTimeCard, $style.kurikinton]">
-        <strong>栗きんとん</strong>
-        <span v-if="waitTimes.kurikinton !== null">{{ waitTimes.kurikinton }} <span :class="$style.min">分</span></span>
-        <span v-else>現在提供不可</span>
-      </div>
-    </div>
-    <div v-else :class="$style.loadingContainer">
-      <ProgressSpinner stroke-width="5" />
     </div>
   </div>
 </template>
 
 <style module>
+.background {
+  background-color: #f4f5f7;
+  width: 100dvw;
+  height: 100dvh;
+  align-content: center;
+}
+
 .container {
   display: flex;
   flex-direction: column;
@@ -57,7 +67,6 @@ onUnmounted(() => {
   gap: 20px;
   padding: 20px;
   height: 100dvh;
-  background-color: #f4f5f7;
 }
 
 .waitTimesContainer {
@@ -117,5 +126,18 @@ onUnmounted(() => {
   font-size: 20px;
   right: -27px;
   bottom: 30px;
+}
+
+@media screen and (min-width: 600px) {
+  .container {
+    max-width: 800px;
+    max-height: 350px;
+    margin: auto;
+  }
+
+  .waitTimesContainer {
+    grid-template-rows: none;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
 }
 </style>
