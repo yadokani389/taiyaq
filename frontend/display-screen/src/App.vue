@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { client } from './services/api'
 import type { DisplayResponse } from './types/api'
 
@@ -7,7 +7,17 @@ const displayData = ref<DisplayResponse>({ ready: [], cooking: [], waiting: [] }
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
+const readyViewportRef = ref<HTMLElement>()
+const cookingViewportRef = ref<HTMLElement>()
+const readyTrackRef = ref<HTMLElement>()
+const cookingTrackRef = ref<HTMLElement>()
+
+const readyNeedsScroll = ref(false)
+const cookingNeedsScroll = ref(false)
+
 let intervalId: number | undefined = undefined
+let readyResizeObserver: ResizeObserver | null = null
+let cookingResizeObserver: ResizeObserver | null = null
 
 function fetchData() {
   error.value = null
@@ -15,6 +25,9 @@ function fetchData() {
     .fetchDisplayOrders()
     .then((data: DisplayResponse) => {
       displayData.value = data
+      nextTick(() => {
+        checkOverflow()
+      })
     })
     .catch((err: Error) => {
       error.value = err instanceof Error ? err.message : 'Failed to fetch data'
@@ -24,12 +37,37 @@ function fetchData() {
     })
 }
 
-// スクロール判定の閾値（必要に応じて調整）
-const scrollThreshold = 4
+function checkOverflow() {
+  if (readyViewportRef.value && readyTrackRef.value) {
+    readyNeedsScroll.value = readyTrackRef.value.scrollHeight > readyViewportRef.value.clientHeight
+  }
+  if (cookingViewportRef.value && cookingTrackRef.value) {
+    cookingNeedsScroll.value =
+      cookingTrackRef.value.scrollHeight > cookingViewportRef.value.clientHeight
+  }
+}
+
+function setupResizeObservers() {
+  if (readyViewportRef.value && readyTrackRef.value) {
+    readyResizeObserver = new ResizeObserver(() => {
+      checkOverflow()
+    })
+    readyResizeObserver.observe(readyViewportRef.value)
+    readyResizeObserver.observe(readyTrackRef.value)
+  }
+
+  if (cookingViewportRef.value && cookingTrackRef.value) {
+    cookingResizeObserver = new ResizeObserver(() => {
+      checkOverflow()
+    })
+    cookingResizeObserver.observe(cookingViewportRef.value)
+    cookingResizeObserver.observe(cookingTrackRef.value)
+  }
+}
 
 // スクロールが必要かどうか
-const readyScrolling = computed(() => displayData.value.ready.length >= scrollThreshold)
-const cookingScrolling = computed(() => displayData.value.cooking.length >= scrollThreshold)
+const readyScrolling = computed(() => readyNeedsScroll.value)
+const cookingScrolling = computed(() => cookingNeedsScroll.value)
 
 // シームレスループ用に配列を複製
 const readyTrack = computed(() => {
@@ -51,11 +89,20 @@ const cookingDuration = computed(
 onMounted(() => {
   fetchData()
   intervalId = setInterval(fetchData, 2500)
+  nextTick(() => {
+    setupResizeObservers()
+  })
 })
 
 onUnmounted(() => {
   if (intervalId) {
     clearInterval(intervalId)
+  }
+  if (readyResizeObserver) {
+    readyResizeObserver.disconnect()
+  }
+  if (cookingResizeObserver) {
+    cookingResizeObserver.disconnect()
   }
 })
 </script>
@@ -74,11 +121,12 @@ onUnmounted(() => {
         <div v-if="displayData.ready.length === 0" class="no-orders">なし</div>
         <div
           v-else
+          ref="readyViewportRef"
           class="order-numbers-viewport"
           :class="{ scrolling: readyScrolling }"
           :style="{ '--scroll-duration': readyDuration }"
         >
-          <div class="scroll-track">
+          <div ref="readyTrackRef" class="scroll-track">
             <span
               v-for="(order, idx) in readyTrack"
               :key="order.id + '-' + idx"
@@ -100,11 +148,12 @@ onUnmounted(() => {
         </div>
         <div
           v-else
+          ref="cookingViewportRef"
           class="order-numbers-viewport"
           :class="{ scrolling: cookingScrolling }"
           :style="{ '--scroll-duration': cookingDuration }"
         >
-          <div class="scroll-track">
+          <div ref="cookingTrackRef" class="scroll-track">
             <span
               v-for="(order, idx) in cookingTrack"
               :key="order.id + '-' + idx"
@@ -121,16 +170,17 @@ onUnmounted(() => {
 
 <style scoped>
 .display-screen {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
   padding: 1.5rem;
   text-align: center;
   font-family: system-ui, sans-serif;
   box-sizing: border-box;
-  min-height: 100vh;
   /* 画面全体に収める */
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 h1 {
@@ -193,11 +243,11 @@ h2 {
 /* スクロール用ビューポート */
 .order-numbers-viewport {
   width: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   margin-top: 0.5rem;
-  /* 画面に収めるための最大高さ（header や余白を考慮） */
-  max-height: calc(100vh - 220px);
+  flex: 1;
   /* 縦スクロール用に縦方向の配置を想定 */
   display: block;
 }
