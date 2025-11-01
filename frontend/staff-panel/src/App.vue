@@ -85,20 +85,29 @@ const flavorCodeToJP: Record<Flavor, keyof FlavorCounts> = {
 
 const statusCounts = computed(() => {
   // 明確な型を付与
-  const counts: { waiting: FlavorCounts; cooking: FlavorCounts; waitingAndCooking: FlavorCounts } =
-  {
+  const counts: {
+    waiting: FlavorCounts
+    cooking: FlavorCounts
+    ready: FlavorCounts
+    waitingAndCooking: FlavorCounts
+  } = {
     waiting: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
     cooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+    ready: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
     waitingAndCooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
   }
 
   orders.value.forEach((order) => {
-    if (order.status === 'waiting' || order.status === 'cooking') {
+    if (order.status === 'waiting' || order.status === 'cooking' || order.status === 'ready') {
       order.items.forEach((item) => {
         const flavorName = flavorCodeToJP[item.flavor] as keyof FlavorCounts
-        const statusKey = order.status as 'waiting' | 'cooking'
-        counts[statusKey][flavorName] += item.quantity
-        counts.waitingAndCooking[flavorName] += item.quantity
+        if (order.status === 'waiting' || order.status === 'cooking') {
+          const statusKey = order.status as 'waiting' | 'cooking'
+          counts[statusKey][flavorName] += item.quantity
+          counts.waitingAndCooking[flavorName] += item.quantity
+        } else if (order.status === 'ready') {
+          counts.ready[flavorName] += item.quantity
+        }
       })
     }
   })
@@ -440,7 +449,11 @@ onMounted(() => {
             <div class="setting-row">
               <div class="form-group">
                 <label>調理時間 (分):</label>
-                <input type="number" v-model.number="settings.つぶあん.cookingTimeMinutes" min="1" />
+                <input
+                  type="number"
+                  v-model.number="settings.つぶあん.cookingTimeMinutes"
+                  min="1"
+                />
               </div>
               <div class="form-group">
                 <label>バッチサイズ (個):</label>
@@ -454,11 +467,19 @@ onMounted(() => {
             <div class="setting-row">
               <div class="form-group">
                 <label>調理時間 (分):</label>
-                <input type="number" v-model.number="settings.カスタード.cookingTimeMinutes" min="1" />
+                <input
+                  type="number"
+                  v-model.number="settings.カスタード.cookingTimeMinutes"
+                  min="1"
+                />
               </div>
               <div class="form-group">
                 <label>バッチサイズ (個):</label>
-                <input type="number" v-model.number="settings.カスタード.quantityPerBatch" min="1" />
+                <input
+                  type="number"
+                  v-model.number="settings.カスタード.quantityPerBatch"
+                  min="1"
+                />
               </div>
             </div>
           </div>
@@ -468,11 +489,19 @@ onMounted(() => {
             <div class="setting-row">
               <div class="form-group">
                 <label>調理時間 (分):</label>
-                <input type="number" v-model.number="settings.栗きんとん.cookingTimeMinutes" min="1" />
+                <input
+                  type="number"
+                  v-model.number="settings.栗きんとん.cookingTimeMinutes"
+                  min="1"
+                />
               </div>
               <div class="form-group">
                 <label>バッチサイズ (個):</label>
-                <input type="number" v-model.number="settings.栗きんとん.quantityPerBatch" min="1" />
+                <input
+                  type="number"
+                  v-model.number="settings.栗きんとん.quantityPerBatch"
+                  min="1"
+                />
               </div>
             </div>
           </div>
@@ -489,18 +518,46 @@ onMounted(() => {
       <div class="order-list">
         <div class="filters-row">
           <div class="status-filters">
-            <label><input type="checkbox" v-model="statusFilters.all" @change="handleAllFilter" />
-              All</label>
-            <label><input type="checkbox" v-model="statusFilters.waiting" @change="handleStatusFilter" />
-              waiting</label>
-            <label><input type="checkbox" v-model="statusFilters.cooking" @change="handleStatusFilter" />
-              cooking</label>
-            <label><input type="checkbox" v-model="statusFilters.ready" @change="handleStatusFilter" />
-              ready</label>
-            <label><input type="checkbox" v-model="statusFilters.completed" @change="handleStatusFilter" />
-              completed</label>
-            <label><input type="checkbox" v-model="statusFilters.cancelled" @change="handleStatusFilter" />
-              cancelled</label>
+            <label
+              ><input type="checkbox" v-model="statusFilters.all" @change="handleAllFilter" />
+              All</label
+            >
+            <label
+              ><input
+                type="checkbox"
+                v-model="statusFilters.waiting"
+                @change="handleStatusFilter"
+              />
+              waiting</label
+            >
+            <label
+              ><input
+                type="checkbox"
+                v-model="statusFilters.cooking"
+                @change="handleStatusFilter"
+              />
+              cooking</label
+            >
+            <label
+              ><input type="checkbox" v-model="statusFilters.ready" @change="handleStatusFilter" />
+              ready</label
+            >
+            <label
+              ><input
+                type="checkbox"
+                v-model="statusFilters.completed"
+                @change="handleStatusFilter"
+              />
+              completed</label
+            >
+            <label
+              ><input
+                type="checkbox"
+                v-model="statusFilters.cancelled"
+                @change="handleStatusFilter"
+              />
+              cancelled</label
+            >
           </div>
           <button @click="fetchOrders" class="refresh-btn">更新</button>
         </div>
@@ -511,12 +568,14 @@ onMounted(() => {
               <span class="flavor-count">つぶあん: {{ statusCounts.waiting.つぶあん }}個</span>
               <span class="flavor-count">カスタード: {{ statusCounts.waiting.カスタード }}個</span>
               <span class="flavor-count">栗きんとん: {{ statusCounts.waiting.栗きんとん }}個</span>
-              <span class="flavor-count total">合計:
+              <span class="flavor-count total"
+                >合計:
                 {{
                   statusCounts.waiting.つぶあん +
                   statusCounts.waiting.カスタード +
                   statusCounts.waiting.栗きんとん
-                }}個</span>
+                }}個</span
+              >
             </div>
           </div>
           <div class="status-group">
@@ -525,26 +584,52 @@ onMounted(() => {
               <span class="flavor-count">つぶあん: {{ statusCounts.cooking.つぶあん }}個</span>
               <span class="flavor-count">カスタード: {{ statusCounts.cooking.カスタード }}個</span>
               <span class="flavor-count">栗きんとん: {{ statusCounts.cooking.栗きんとん }}個</span>
-              <span class="flavor-count total">合計:
+              <span class="flavor-count total"
+                >合計:
                 {{
                   statusCounts.cooking.つぶあん +
                   statusCounts.cooking.カスタード +
                   statusCounts.cooking.栗きんとん
-                }}個</span>
+                }}個</span
+              >
             </div>
           </div>
           <div class="status-group">
             <h4>waiting+cooking</h4>
             <div class="flavor-counts">
-              <span class="flavor-count">つぶあん: {{ statusCounts.waitingAndCooking.つぶあん }}個</span>
-              <span class="flavor-count">カスタード: {{ statusCounts.waitingAndCooking.カスタード }}個</span>
-              <span class="flavor-count">栗きんとん: {{ statusCounts.waitingAndCooking.栗きんとん }}個</span>
-              <span class="flavor-count total">合計:
+              <span class="flavor-count"
+                >つぶあん: {{ statusCounts.waitingAndCooking.つぶあん }}個</span
+              >
+              <span class="flavor-count"
+                >カスタード: {{ statusCounts.waitingAndCooking.カスタード }}個</span
+              >
+              <span class="flavor-count"
+                >栗きんとん: {{ statusCounts.waitingAndCooking.栗きんとん }}個</span
+              >
+              <span class="flavor-count total"
+                >合計:
                 {{
                   statusCounts.waitingAndCooking.つぶあん +
                   statusCounts.waitingAndCooking.カスタード +
                   statusCounts.waitingAndCooking.栗きんとん
-                }}個</span>
+                }}個</span
+              >
+            </div>
+          </div>
+          <div class="status-group">
+            <h4>ready</h4>
+            <div class="flavor-counts">
+              <span class="flavor-count">つぶあん: {{ statusCounts.ready.つぶあん }}個</span>
+              <span class="flavor-count">カスタード: {{ statusCounts.ready.カスタード }}個</span>
+              <span class="flavor-count">栗きんとん: {{ statusCounts.ready.栗きんとん }}個</span>
+              <span class="flavor-count total"
+                >合計:
+                {{
+                  statusCounts.ready.つぶあん +
+                  statusCounts.ready.カスタード +
+                  statusCounts.ready.栗きんとん
+                }}個</span
+              >
             </div>
           </div>
           <div class="status-group">
@@ -553,8 +638,35 @@ onMounted(() => {
               <span class="flavor-count">つぶあん: {{ stockData.つぶあん }}個</span>
               <span class="flavor-count">カスタード: {{ stockData.カスタード }}個</span>
               <span class="flavor-count">栗きんとん: {{ stockData.栗きんとん }}個</span>
-              <span class="flavor-count total">合計:
-                {{ stockData.つぶあん + stockData.カスタード + stockData.栗きんとん }}個</span>
+              <span class="flavor-count total"
+                >合計:
+                {{ stockData.つぶあん + stockData.カスタード + stockData.栗きんとん }}個</span
+              >
+            </div>
+          </div>
+          <div class="status-group">
+            <h4>stock+ready</h4>
+            <div class="flavor-counts">
+              <span class="flavor-count"
+                >つぶあん: {{ stockData.つぶあん + statusCounts.ready.つぶあん }}個</span
+              >
+              <span class="flavor-count"
+                >カスタード: {{ stockData.カスタード + statusCounts.ready.カスタード }}個</span
+              >
+              <span class="flavor-count"
+                >栗きんとん: {{ stockData.栗きんとん + statusCounts.ready.栗きんとん }}個</span
+              >
+              <span class="flavor-count total"
+                >合計:
+                {{
+                  stockData.つぶあん +
+                  statusCounts.ready.つぶあん +
+                  stockData.カスタード +
+                  statusCounts.ready.カスタード +
+                  stockData.栗きんとん +
+                  statusCounts.ready.栗きんとん
+                }}個</span
+              >
             </div>
           </div>
         </div>
@@ -572,15 +684,25 @@ onMounted(() => {
               </span>
             </div>
             <div class="order-actions">
-              <button v-if="['waiting', 'cooking', 'ready'].includes(order.status)" @click="cancelOrder(order.id)"
-                class="action-btn cancel-btn">
+              <button
+                v-if="['waiting', 'cooking', 'ready'].includes(order.status)"
+                @click="cancelOrder(order.id)"
+                class="action-btn cancel-btn"
+              >
                 キャンセル
               </button>
-              <button v-if="['waiting', 'cooking'].includes(order.status)" @click="increasePriority(order.id)"
-                class="action-btn priority-btn">
+              <button
+                v-if="['waiting', 'cooking'].includes(order.status)"
+                @click="increasePriority(order.id)"
+                class="action-btn priority-btn"
+              >
                 優先度上げ
               </button>
-              <button v-if="order.status === 'ready'" @click="completeOrder(order.id)" class="action-btn complete-btn">
+              <button
+                v-if="order.status === 'ready'"
+                @click="completeOrder(order.id)"
+                class="action-btn complete-btn"
+              >
                 受け渡し完了
               </button>
             </div>
