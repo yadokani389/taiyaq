@@ -86,11 +86,11 @@ const flavorCodeToJP: Record<Flavor, keyof FlavorCounts> = {
 const statusCounts = computed(() => {
   // 明確な型を付与
   const counts: { waiting: FlavorCounts; cooking: FlavorCounts; waitingAndCooking: FlavorCounts } =
-    {
-      waiting: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
-      cooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
-      waitingAndCooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
-    }
+  {
+    waiting: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+    cooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+    waitingAndCooking: { つぶあん: 0, カスタード: 0, 栗きんとん: 0 },
+  }
 
   orders.value.forEach((order) => {
     if (order.status === 'waiting' || order.status === 'cooking') {
@@ -158,17 +158,6 @@ const submitOrder = async () => {
     return
   }
 
-  // 確認画面
-  const itemsText = items
-    .map((item) => `${getFlavorName(item.flavor)}: ${item.quantity}個`)
-    .join('\n')
-  const priorityText = orderForm.value.priority ? '優先注文' : '通常注文'
-  const confirmMessage = `以下の注文を追加しますか？\n\n${itemsText}\n\n${priorityText}`
-
-  if (!confirm(confirmMessage)) {
-    return
-  }
-
   const requestData = {
     items,
     isPriority: orderForm.value.priority,
@@ -211,16 +200,6 @@ const submitBaking = async () => {
     return
   }
 
-  // 確認画面
-  const itemsText = items
-    .map((item) => `${getFlavorName(item.flavor)}: ${item.quantity}個`)
-    .join('\n')
-  const confirmMessage = `以下の焼き上がりを報告しますか？\n\n${itemsText}`
-
-  if (!confirm(confirmMessage)) {
-    return
-  }
-
   const requestData = { items }
   console.log('Reporting production:', requestData)
   const response = await productionApi.reportProduction(requestData)
@@ -245,51 +224,45 @@ const submitBaking = async () => {
 }
 
 const cancelOrder = async (orderId: number) => {
-  if (confirm('このオーダーをキャンセルしますか？')) {
-    console.log('Cancelling order:', orderId)
-    const response = await ordersApi.cancelOrder(orderId)
-    console.log('Cancel order response:', response)
+  console.log('Cancelling order:', orderId)
+  const response = await ordersApi.cancelOrder(orderId)
+  console.log('Cancel order response:', response)
 
-    if (response.error) {
-      alert(`キャンセルに失敗しました: ${response.error.message}`)
-      return
-    }
-
-    await fetchOrders()
+  if (response.error) {
+    alert(`キャンセルに失敗しました: ${response.error.message}`)
+    return
   }
+
+  await fetchOrders()
 }
 
 const increasePriority = async (orderId: number) => {
-  if (confirm('このオーダーの優先度を上げますか？')) {
-    const requestData = {
-      isPriority: true,
-    }
-    console.log('Updating priority for order:', orderId, requestData)
-    const response = await ordersApi.updatePriority(orderId, requestData)
-    console.log('Update priority response:', response)
-
-    if (response.error) {
-      alert(`優先度の変更に失敗しました: ${response.error.message}`)
-      return
-    }
-
-    await fetchOrders()
+  const requestData = {
+    isPriority: true,
   }
+  console.log('Updating priority for order:', orderId, requestData)
+  const response = await ordersApi.updatePriority(orderId, requestData)
+  console.log('Update priority response:', response)
+
+  if (response.error) {
+    alert(`優先度の変更に失敗しました: ${response.error.message}`)
+    return
+  }
+
+  await fetchOrders()
 }
 
 const completeOrder = async (orderId: number) => {
-  if (confirm('このオーダーを完了しますか？')) {
-    console.log('Completing order:', orderId)
-    const response = await ordersApi.completeOrder(orderId)
-    console.log('Complete order response:', response)
+  console.log('Completing order:', orderId)
+  const response = await ordersApi.completeOrder(orderId)
+  console.log('Complete order response:', response)
 
-    if (response.error) {
-      alert(`完了処理に失敗しました: ${response.error.message}`)
-      return
-    }
-
-    await fetchOrders()
+  if (response.error) {
+    alert(`完了処理に失敗しました: ${response.error.message}`)
+    return
   }
+
+  await fetchOrders()
 }
 
 const saveAppSettings = () => {
@@ -395,18 +368,36 @@ onMounted(() => {
           <h3>注文の追加</h3>
           <div class="form-group">
             <label>つぶあん:</label>
+            <div class="quick-buttons">
+              <button @click="orderForm.つぶあん = 0">0個</button>
+              <button @click="orderForm.つぶあん = 1">1個</button>
+              <button @click="orderForm.つぶあん = 2">2個</button>
+              <button @click="orderForm.つぶあん = 3">3個</button>
+            </div>
             <select v-model="orderForm.つぶあん">
               <option v-for="n in 21" :key="n - 1" :value="n - 1">{{ n - 1 }}個</option>
             </select>
           </div>
           <div class="form-group">
             <label>カスタード:</label>
+            <div class="quick-buttons">
+              <button @click="orderForm.カスタード = 0">0個</button>
+              <button @click="orderForm.カスタード = 1">1個</button>
+              <button @click="orderForm.カスタード = 2">2個</button>
+              <button @click="orderForm.カスタード = 3">3個</button>
+            </div>
             <select v-model="orderForm.カスタード">
               <option v-for="n in 21" :key="n - 1" :value="n - 1">{{ n - 1 }}個</option>
             </select>
           </div>
           <div class="form-group">
             <label>栗きんとん:</label>
+            <div class="quick-buttons">
+              <button @click="orderForm.栗きんとん = 0">0個</button>
+              <button @click="orderForm.栗きんとん = 1">1個</button>
+              <button @click="orderForm.栗きんとん = 2">2個</button>
+              <button @click="orderForm.栗きんとん = 3">3個</button>
+            </div>
             <select v-model="orderForm.栗きんとん">
               <option v-for="n in 21" :key="n - 1" :value="n - 1">{{ n - 1 }}個</option>
             </select>
@@ -449,11 +440,7 @@ onMounted(() => {
             <div class="setting-row">
               <div class="form-group">
                 <label>調理時間 (分):</label>
-                <input
-                  type="number"
-                  v-model.number="settings.つぶあん.cookingTimeMinutes"
-                  min="1"
-                />
+                <input type="number" v-model.number="settings.つぶあん.cookingTimeMinutes" min="1" />
               </div>
               <div class="form-group">
                 <label>バッチサイズ (個):</label>
@@ -467,19 +454,11 @@ onMounted(() => {
             <div class="setting-row">
               <div class="form-group">
                 <label>調理時間 (分):</label>
-                <input
-                  type="number"
-                  v-model.number="settings.カスタード.cookingTimeMinutes"
-                  min="1"
-                />
+                <input type="number" v-model.number="settings.カスタード.cookingTimeMinutes" min="1" />
               </div>
               <div class="form-group">
                 <label>バッチサイズ (個):</label>
-                <input
-                  type="number"
-                  v-model.number="settings.カスタード.quantityPerBatch"
-                  min="1"
-                />
+                <input type="number" v-model.number="settings.カスタード.quantityPerBatch" min="1" />
               </div>
             </div>
           </div>
@@ -489,19 +468,11 @@ onMounted(() => {
             <div class="setting-row">
               <div class="form-group">
                 <label>調理時間 (分):</label>
-                <input
-                  type="number"
-                  v-model.number="settings.栗きんとん.cookingTimeMinutes"
-                  min="1"
-                />
+                <input type="number" v-model.number="settings.栗きんとん.cookingTimeMinutes" min="1" />
               </div>
               <div class="form-group">
                 <label>バッチサイズ (個):</label>
-                <input
-                  type="number"
-                  v-model.number="settings.栗きんとん.quantityPerBatch"
-                  min="1"
-                />
+                <input type="number" v-model.number="settings.栗きんとん.quantityPerBatch" min="1" />
               </div>
             </div>
           </div>
@@ -518,46 +489,18 @@ onMounted(() => {
       <div class="order-list">
         <div class="filters-row">
           <div class="status-filters">
-            <label
-              ><input type="checkbox" v-model="statusFilters.all" @change="handleAllFilter" />
-              All</label
-            >
-            <label
-              ><input
-                type="checkbox"
-                v-model="statusFilters.waiting"
-                @change="handleStatusFilter"
-              />
-              waiting</label
-            >
-            <label
-              ><input
-                type="checkbox"
-                v-model="statusFilters.cooking"
-                @change="handleStatusFilter"
-              />
-              cooking</label
-            >
-            <label
-              ><input type="checkbox" v-model="statusFilters.ready" @change="handleStatusFilter" />
-              ready</label
-            >
-            <label
-              ><input
-                type="checkbox"
-                v-model="statusFilters.completed"
-                @change="handleStatusFilter"
-              />
-              completed</label
-            >
-            <label
-              ><input
-                type="checkbox"
-                v-model="statusFilters.cancelled"
-                @change="handleStatusFilter"
-              />
-              cancelled</label
-            >
+            <label><input type="checkbox" v-model="statusFilters.all" @change="handleAllFilter" />
+              All</label>
+            <label><input type="checkbox" v-model="statusFilters.waiting" @change="handleStatusFilter" />
+              waiting</label>
+            <label><input type="checkbox" v-model="statusFilters.cooking" @change="handleStatusFilter" />
+              cooking</label>
+            <label><input type="checkbox" v-model="statusFilters.ready" @change="handleStatusFilter" />
+              ready</label>
+            <label><input type="checkbox" v-model="statusFilters.completed" @change="handleStatusFilter" />
+              completed</label>
+            <label><input type="checkbox" v-model="statusFilters.cancelled" @change="handleStatusFilter" />
+              cancelled</label>
           </div>
           <button @click="fetchOrders" class="refresh-btn">更新</button>
         </div>
@@ -568,14 +511,12 @@ onMounted(() => {
               <span class="flavor-count">つぶあん: {{ statusCounts.waiting.つぶあん }}個</span>
               <span class="flavor-count">カスタード: {{ statusCounts.waiting.カスタード }}個</span>
               <span class="flavor-count">栗きんとん: {{ statusCounts.waiting.栗きんとん }}個</span>
-              <span class="flavor-count total"
-                >合計:
+              <span class="flavor-count total">合計:
                 {{
                   statusCounts.waiting.つぶあん +
                   statusCounts.waiting.カスタード +
                   statusCounts.waiting.栗きんとん
-                }}個</span
-              >
+                }}個</span>
             </div>
           </div>
           <div class="status-group">
@@ -584,36 +525,26 @@ onMounted(() => {
               <span class="flavor-count">つぶあん: {{ statusCounts.cooking.つぶあん }}個</span>
               <span class="flavor-count">カスタード: {{ statusCounts.cooking.カスタード }}個</span>
               <span class="flavor-count">栗きんとん: {{ statusCounts.cooking.栗きんとん }}個</span>
-              <span class="flavor-count total"
-                >合計:
+              <span class="flavor-count total">合計:
                 {{
                   statusCounts.cooking.つぶあん +
                   statusCounts.cooking.カスタード +
                   statusCounts.cooking.栗きんとん
-                }}個</span
-              >
+                }}個</span>
             </div>
           </div>
           <div class="status-group">
             <h4>waiting+cooking</h4>
             <div class="flavor-counts">
-              <span class="flavor-count"
-                >つぶあん: {{ statusCounts.waitingAndCooking.つぶあん }}個</span
-              >
-              <span class="flavor-count"
-                >カスタード: {{ statusCounts.waitingAndCooking.カスタード }}個</span
-              >
-              <span class="flavor-count"
-                >栗きんとん: {{ statusCounts.waitingAndCooking.栗きんとん }}個</span
-              >
-              <span class="flavor-count total"
-                >合計:
+              <span class="flavor-count">つぶあん: {{ statusCounts.waitingAndCooking.つぶあん }}個</span>
+              <span class="flavor-count">カスタード: {{ statusCounts.waitingAndCooking.カスタード }}個</span>
+              <span class="flavor-count">栗きんとん: {{ statusCounts.waitingAndCooking.栗きんとん }}個</span>
+              <span class="flavor-count total">合計:
                 {{
                   statusCounts.waitingAndCooking.つぶあん +
                   statusCounts.waitingAndCooking.カスタード +
                   statusCounts.waitingAndCooking.栗きんとん
-                }}個</span
-              >
+                }}個</span>
             </div>
           </div>
           <div class="status-group">
@@ -622,10 +553,8 @@ onMounted(() => {
               <span class="flavor-count">つぶあん: {{ stockData.つぶあん }}個</span>
               <span class="flavor-count">カスタード: {{ stockData.カスタード }}個</span>
               <span class="flavor-count">栗きんとん: {{ stockData.栗きんとん }}個</span>
-              <span class="flavor-count total"
-                >合計:
-                {{ stockData.つぶあん + stockData.カスタード + stockData.栗きんとん }}個</span
-              >
+              <span class="flavor-count total">合計:
+                {{ stockData.つぶあん + stockData.カスタード + stockData.栗きんとん }}個</span>
             </div>
           </div>
         </div>
@@ -643,25 +572,15 @@ onMounted(() => {
               </span>
             </div>
             <div class="order-actions">
-              <button
-                v-if="['waiting', 'cooking', 'ready'].includes(order.status)"
-                @click="cancelOrder(order.id)"
-                class="action-btn cancel-btn"
-              >
+              <button v-if="['waiting', 'cooking', 'ready'].includes(order.status)" @click="cancelOrder(order.id)"
+                class="action-btn cancel-btn">
                 キャンセル
               </button>
-              <button
-                v-if="['waiting', 'cooking'].includes(order.status)"
-                @click="increasePriority(order.id)"
-                class="action-btn priority-btn"
-              >
+              <button v-if="['waiting', 'cooking'].includes(order.status)" @click="increasePriority(order.id)"
+                class="action-btn priority-btn">
                 優先度上げ
               </button>
-              <button
-                v-if="order.status === 'ready'"
-                @click="completeOrder(order.id)"
-                class="action-btn complete-btn"
-              >
+              <button v-if="order.status === 'ready'" @click="completeOrder(order.id)" class="action-btn complete-btn">
                 受け渡し完了
               </button>
             </div>
@@ -831,6 +750,21 @@ onMounted(() => {
 .form-group input[type='checkbox'] {
   margin-right: 8px;
   accent-color: #fff;
+}
+
+.quick-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.quick-buttons button {
+  padding: 6px 12px;
+  background: #444;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
 }
 
 .submit-btn {
