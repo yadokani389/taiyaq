@@ -20,3 +20,4 @@ target/
 .env
 
 data.json
+backups/*

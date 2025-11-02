@@ -1,18 +1,12 @@
 use std::net::SocketAddr;
 
-use api::route::routes;
 use axum::http::{HeaderName, Method};
 use dotenvy::dotenv;
 use poise::serenity_prelude::*;
+use taiyaq_backend::api::route::routes;
+use taiyaq_backend::app::AppRegistry;
+use taiyaq_backend::discord;
 use tower_http::cors::{self, CorsLayer};
-
-use crate::app::AppRegistry;
-
-mod api;
-mod app;
-mod data;
-pub mod discord;
-pub mod line;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -43,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
                 let app = routes().with_state(registry.clone()).layer(cors());
 
-                let addr = SocketAddr::from(([127, 0, 0, 1], 38000));
+                let addr = SocketAddr::from(([0, 0, 0, 0], 38000));
                 println!("listening on {}", addr);
                 let listener = tokio::net::TcpListener::bind(addr).await?;
 
