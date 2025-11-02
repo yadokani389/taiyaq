@@ -141,6 +141,17 @@ impl AppRegistry {
 
             if is_cooking {
                 order.status = OrderStatus::Cooking;
+                for notify in &order.notify {
+                    self.send_notification(
+                        order.id,
+                        notify,
+                        format!(
+                            "#{}番 調理中です！\n遠くにいる場合は近くでお待ちください。",
+                            order.id
+                        ),
+                    )
+                    .await;
+                }
             }
 
             // Update cumulative demand for the next iteration
