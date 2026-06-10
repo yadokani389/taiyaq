@@ -228,10 +228,19 @@ impl AppRegistry {
     pub async fn complete_order(&self, id: u32) -> Option<Order> {
         let mut data = self.data.write().await;
         let order = data.orders.iter_mut().find(|o| o.id == id)?;
+        let previous_status = order.status;
         order.status = OrderStatus::Completed;
         order.completed_at = Some(Utc::now());
 
         let order = order.clone();
+
+        if matches!(
+            previous_status,
+            OrderStatus::Waiting | OrderStatus::Cooking | OrderStatus::Ready
+        ) {
+            self.update_order_statuses(&mut data).await;
+        }
+
         drop(data);
         self.save_data().await.ok();
         Some(order)
@@ -242,7 +251,8 @@ impl AppRegistry {
 
         // Find the index of the order to avoid borrowing issues
         let order_idx = data.orders.iter().position(|o| o.id == id)?;
-        let items_to_return = if data.orders[order_idx].status == OrderStatus::Ready {
+        let previous_status = data.orders[order_idx].status;
+        let items_to_return = if previous_status == OrderStatus::Ready {
             // Clone the items to release the borrow on `data.orders`
             Some(data.orders[order_idx].items.clone())
         } else {
@@ -263,8 +273,10 @@ impl AppRegistry {
             false
         };
 
-        // If stock was changed, other orders might have become ready or cooking
-        if stock_was_changed {
+        // If demand or stock changed, other orders might have become ready or cooking.
+        if stock_was_changed
+            || matches!(previous_status, OrderStatus::Waiting | OrderStatus::Cooking)
+        {
             self.update_order_statuses(&mut data).await;
         }
 
