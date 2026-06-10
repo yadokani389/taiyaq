@@ -38,6 +38,7 @@ rustPlatform.buildRustPackage {
   doCheck = false;
 
   meta = {
+    mainProgram = "taiyaq-backend";
     license = with lib.licenses; [
       mit
       asl20

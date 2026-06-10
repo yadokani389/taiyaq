@@ -100,7 +100,10 @@
             settings = {
               hooks = {
                 ripsecrets.enable = true;
-                typos.enable = true;
+                typos = {
+                  enable = true;
+                  settings.ignored-words = [ "styl" ];
+                };
                 treefmt.enable = true;
                 clippy = {
                   enable = true;
@@ -122,6 +125,9 @@
               processes = {
                 backend-server.command = lib.getExe config.packages.taiyaq-backend;
                 backup.command = lib.getExe backup;
+                staff-panel.command = "${lib.getExe pkgs.serve} -s frontend/staff-panel/dist -l 38001";
+                display-screen.command = "${lib.getExe pkgs.serve} -s frontend/display-screen/dist -l 38002";
+                user-display.command = "${lib.getExe pkgs.serve} -s frontend/user-display/dist -l 38003";
               };
             };
           };
