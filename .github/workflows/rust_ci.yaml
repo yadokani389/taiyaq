@@ -1,0 +1,50 @@
+name: Rust CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "flake.lock"
+      - "flake.nix"
+      - ".github/workflows/rust_ci.yaml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "flake.lock"
+      - "flake.nix"
+      - ".github/workflows/rust_ci.yaml"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust:
+    name: Rust CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "backend -> target"
+
+      - name: Run flake checks
+        run: nix flake check -L
+
+      - name: Run tests
+        run: nix develop -c cargo test --manifest-path backend/Cargo.toml --all-targets
+
+      - name: Build Nix package
+        run: nix build -L --no-link .#taiyaq-backend

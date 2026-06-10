@@ -105,13 +105,25 @@
                   settings.ignored-words = [ "styl" ];
                 };
                 treefmt.enable = true;
-                clippy = {
-                  enable = true;
-                  packageOverrides.cargo = rust-toolchain;
-                  packageOverrides.clippy = rust-toolchain;
-                  settings.extraArgs = "--manifest-path backend/Cargo.toml";
-                };
               };
+            };
+          };
+
+          checks.clippy-backend = inputs.git-hooks-nix.lib.${system}.run {
+            src = ./backend;
+            settings.rust = {
+              cargoManifestPath = "Cargo.toml";
+              check.cargoDeps = config.packages.taiyaq-backend.cargoDeps;
+            };
+            hooks.clippy = {
+              enable = true;
+              packageOverrides.cargo = rust-toolchain;
+              packageOverrides.clippy = rust-toolchain;
+              settings.denyWarnings = true;
+              extraPackages = with pkgs; [
+                openssl
+                pkg-config
+              ];
             };
           };
 

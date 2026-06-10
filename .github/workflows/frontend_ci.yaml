@@ -1,0 +1,38 @@
+name: Frontend CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "flake.lock"
+      - "flake.nix"
+      - ".github/workflows/frontend_ci.yaml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "flake.lock"
+      - "flake.nix"
+      - ".github/workflows/frontend_ci.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Install dependencies
+        run: nix develop -c pnpm --dir frontend install --frozen-lockfile
+
+      - name: Build applications
+        run: nix develop -c pnpm --dir frontend build
