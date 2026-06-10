@@ -132,10 +132,6 @@ impl AppRegistry {
                         is_cooking = false;
                         break; // No need to check other items in this order
                     }
-                } else {
-                    // No config for this flavor, so it can't be determined to be 'cooking'.
-                    is_cooking = false;
-                    break;
                 }
             }
 
