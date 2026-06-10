@@ -1,26 +1,26 @@
 <script lang="ts" setup>
-import { fetchApiWaitTimes } from '@/scripts/api';
-import type { WaitTimesResponse } from '@/types';
-import { ProgressSpinner } from 'primevue';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { fetchApiWaitTimes } from '@/scripts/api'
+import type { WaitTimesResponse } from '@/types'
+import { ProgressSpinner } from 'primevue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const waitTimes = ref<{
-  tsubuan: number | null;
-  custard: number | null;
-  kurikinton: number | null;
-}>();
+  tsubuan: number | null
+  custard: number | null
+  kurikinton: number | null
+}>()
 
-const intervalId = ref<number>();
+const intervalId = ref<number>()
 onMounted(async () => {
-  waitTimes.value = (await fetchApiWaitTimes()).waitTimes;
+  waitTimes.value = (await fetchApiWaitTimes()).waitTimes
   intervalId.value = setInterval(async () => {
-    waitTimes.value = (await fetchApiWaitTimes()).waitTimes;
-  }, 60000);
-});
+    waitTimes.value = (await fetchApiWaitTimes()).waitTimes
+  }, 60000)
+})
 
 onUnmounted(() => {
-  clearInterval(intervalId.value);
-});
+  clearInterval(intervalId.value)
+})
 </script>
 
 <template>
@@ -30,18 +30,23 @@ onUnmounted(() => {
       <div v-if="waitTimes" :class="$style.waitTimesContainer">
         <div :class="[$style.waitTimeCard, $style.tsubuan]">
           <strong>つぶあん</strong>
-          <span v-if="waitTimes.tsubuan !== null">{{ waitTimes.tsubuan }} <span :class="$style.min">分</span></span>
+          <span v-if="waitTimes.tsubuan !== null"
+            >{{ waitTimes.tsubuan }} <span :class="$style.min">分</span></span
+          >
           <span v-else>現在提供不可</span>
         </div>
         <div :class="[$style.waitTimeCard, $style.custard]">
           <strong>カスタード</strong>
-          <span v-if="waitTimes.custard !== null">{{ waitTimes.custard }} <span :class="$style.min">分</span></span>
+          <span v-if="waitTimes.custard !== null"
+            >{{ waitTimes.custard }} <span :class="$style.min">分</span></span
+          >
           <span v-else>現在提供不可</span>
         </div>
         <div :class="[$style.waitTimeCard, $style.kurikinton]">
           <strong>栗きんとん</strong>
-          <span v-if="waitTimes.kurikinton !== null">{{ waitTimes.kurikinton }} <span
-              :class="$style.min">分</span></span>
+          <span v-if="waitTimes.kurikinton !== null"
+            >{{ waitTimes.kurikinton }} <span :class="$style.min">分</span></span
+          >
           <span v-else>現在提供不可</span>
         </div>
       </div>

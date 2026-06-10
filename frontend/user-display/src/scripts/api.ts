@@ -1,4 +1,4 @@
-import type { OrdersDisplayResponse, OrdersIdResponse, WaitTimesResponse } from "@/types";
+import type { OrdersDisplayResponse, OrdersIdResponse, WaitTimesResponse } from '@/types'
 
 const getBaseURL = () => {
   const baseURL = import.meta.env.VITE_API_BASE_URL
@@ -6,7 +6,7 @@ const getBaseURL = () => {
     throw new Error('VITE_API_BASE_URL is not defined in environment variables')
   }
   return baseURL.replace(/\/+$/, '')
-};
+}
 
 export const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> => {
   const response = await fetch(`${getBaseURL()}/api/orders/display`, {
@@ -14,12 +14,12 @@ export const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> =>
     headers: {
       'Content-Type': 'application/json',
     },
-  });
+  })
   if (!response.ok) {
-    throw new Error(`Error fetching orders: ${response.statusText}`);
+    throw new Error(`Error fetching orders: ${response.statusText}`)
   }
-  return await response.json();
-};
+  return await response.json()
+}
 
 export const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdResponse> => {
   const response = await fetch(`${getBaseURL()}/api/orders/${orderId}`, {
@@ -27,12 +27,12 @@ export const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdRespons
     headers: {
       'Content-Type': 'application/json',
     },
-  });
+  })
   if (!response.ok) {
-    throw new Error(`Error fetching order ${orderId}: ${response.statusText}`);
+    throw new Error(`Error fetching order ${orderId}: ${response.statusText}`)
   }
-  return await response.json();
-};
+  return await response.json()
+}
 
 export const fetchApiWaitTimes = async (): Promise<WaitTimesResponse> => {
   const response = await fetch(`${getBaseURL()}/api/wait-times`, {
@@ -40,9 +40,9 @@ export const fetchApiWaitTimes = async (): Promise<WaitTimesResponse> => {
     headers: {
       'Content-Type': 'application/json',
     },
-  });
+  })
   if (!response.ok) {
-    throw new Error(`Error fetching wait times: ${response.statusText}`);
+    throw new Error(`Error fetching wait times: ${response.statusText}`)
   }
-  return await response.json();
+  return await response.json()
 }

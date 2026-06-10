@@ -1,40 +1,44 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, triggerRef } from 'vue';
-import { fetchApiOrdersDisplay, fetchApiOrdersId } from '../scripts/api';
-import { computedAsync } from '@vueuse/core';
-import type { OrdersDisplayResponse } from '../types';
-import { ProgressSpinner, Select } from 'primevue';
+import { computed, onMounted, onUnmounted, ref, triggerRef } from 'vue'
+import { fetchApiOrdersDisplay, fetchApiOrdersId } from '../scripts/api'
+import { computedAsync } from '@vueuse/core'
+import type { OrdersDisplayResponse } from '../types'
+import { ProgressSpinner, Select } from 'primevue'
 
-const orders = ref<OrdersDisplayResponse>();
+const orders = ref<OrdersDisplayResponse>()
 const flattenedOrders = computed(() => {
-  if (!orders.value) return [];
+  if (!orders.value) return []
   return [
-    ...orders.value.cooking.map(order => ({ ...order, status: 'cooking' as const })),
-    ...orders.value.ready.map(order => ({ ...order, status: 'ready' as const })),
-    ...orders.value.waiting.map(order => ({ ...order, status: 'waiting' as const })),
-  ].toSorted((a, b) => b.id - a.id);
-});
+    ...orders.value.cooking.map((order) => ({ ...order, status: 'cooking' as const })),
+    ...orders.value.ready.map((order) => ({ ...order, status: 'ready' as const })),
+    ...orders.value.waiting.map((order) => ({ ...order, status: 'waiting' as const })),
+  ].toSorted((a, b) => b.id - a.id)
+})
 
-const orderId = ref<number>();
-const orderDetail = computedAsync(async () => {
-  if (!orderId.value) return undefined;
-  return await fetchApiOrdersId(orderId.value);
-}, undefined, { lazy: true });
+const orderId = ref<number>()
+const orderDetail = computedAsync(
+  async () => {
+    if (!orderId.value) return undefined
+    return await fetchApiOrdersId(orderId.value)
+  },
+  undefined,
+  { lazy: true },
+)
 
-const intervalId = ref<number>();
+const intervalId = ref<number>()
 onMounted(async () => {
-  orders.value = await fetchApiOrdersDisplay();
-  intervalId.value = setInterval(refresh, 5000);
-});
+  orders.value = await fetchApiOrdersDisplay()
+  intervalId.value = setInterval(refresh, 5000)
+})
 
 onUnmounted(() => {
-  clearInterval(intervalId.value);
-});
+  clearInterval(intervalId.value)
+})
 
 const refresh = async () => {
-  orders.value = await fetchApiOrdersDisplay();
-  triggerRef(orderId);
-};
+  orders.value = await fetchApiOrdersDisplay()
+  triggerRef(orderId)
+}
 </script>
 
 <template>
@@ -42,8 +46,14 @@ const refresh = async () => {
     <div :class="$style.orderDetail">
       <div :class="$style.selectContainer">
         <span>あなたの注文番号を選択：</span>
-        <Select v-model="orderId" size="large" :options="flattenedOrders" :option-value="order => order.id"
-          :option-label="order => `#${order.id}`" :class="$style.select" />
+        <Select
+          v-model="orderId"
+          size="large"
+          :options="flattenedOrders"
+          :option-value="(order) => order.id"
+          :option-label="(order) => `#${order.id}`"
+          :class="$style.select"
+        />
       </div>
       <div v-if="orderDetail" :class="$style.orderDetailContainer">
         <div v-if="orderDetail.status === 'waiting'">
@@ -57,11 +67,18 @@ const refresh = async () => {
         <div v-else-if="orderDetail.status === 'cancelled'">キャンセル済み</div>
 
         <div :class="$style.orderedItems">
-          <div v-for="(item, index) in orderDetail.items" :key="index" :class="[$style.itemCard, {
-            [$style.tsubuan]: item.flavor === 'tsubuan',
-            [$style.custard]: item.flavor === 'custard',
-            [$style.kurikinton]: item.flavor === 'kurikinton',
-          }]">
+          <div
+            v-for="(item, index) in orderDetail.items"
+            :key="index"
+            :class="[
+              $style.itemCard,
+              {
+                [$style.tsubuan]: item.flavor === 'tsubuan',
+                [$style.custard]: item.flavor === 'custard',
+                [$style.kurikinton]: item.flavor === 'kurikinton',
+              },
+            ]"
+          >
             <span>
               {{
                 {
@@ -81,11 +98,19 @@ const refresh = async () => {
       </div>
     </div>
     <div :class="$style.ordersList">
-      <div v-for="order in flattenedOrders" :key="order.id" :class="[$style.orderCard, {
-        [$style.cooking]: order.status === 'cooking',
-        [$style.ready]: order.status === 'ready',
-        [$style.waiting]: order.status === 'waiting',
-      }]" @click="orderId = order.id">
+      <div
+        v-for="order in flattenedOrders"
+        :key="order.id"
+        :class="[
+          $style.orderCard,
+          {
+            [$style.cooking]: order.status === 'cooking',
+            [$style.ready]: order.status === 'ready',
+            [$style.waiting]: order.status === 'waiting',
+          },
+        ]"
+        @click="orderId = order.id"
+      >
         <span>#{{ order.id }}</span>
         <span :class="$style.status">
           {{
@@ -120,7 +145,7 @@ const refresh = async () => {
   padding: 10px;
 }
 
-.mainContainer>div {
+.mainContainer > div {
   border-radius: 8px;
 }
 
@@ -214,7 +239,9 @@ const refresh = async () => {
   height: 100%;
   padding: 10px;
   border-radius: 4px;
-  transition: background-color 0.3s, color 0.3s;
+  transition:
+    background-color 0.3s,
+    color 0.3s;
 }
 
 .orderCard span {

@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { Button, Drawer } from 'primevue';
-import { ref } from 'vue';
+import { Button, Drawer } from 'primevue'
+import { ref } from 'vue'
 
-const drawerVisible = ref(false);
+const drawerVisible = ref(false)
 </script>
 
 <template>
@@ -16,8 +16,14 @@ const drawerVisible = ref(false);
       <a href="https://github.com/yadokani389/taiyaq">TaiyaQ</a>
     </div>
   </Drawer>
-  <Button :class="$style.button" icon="pi pi-bars" severity="secondary" variant="text" rounded
-    @click="drawerVisible = true" />
+  <Button
+    :class="$style.button"
+    icon="pi pi-bars"
+    severity="secondary"
+    variant="text"
+    rounded
+    @click="drawerVisible = true"
+  />
   <RouterView />
 </template>
 
