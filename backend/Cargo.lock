@@ -149,9 +149,11 @@ dependencies = [
 
 [[package]]
 name = "bot_sdk_line"
-version = "0.1.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65a81349d1accf41a13adb64c956de7fb1210343c14481cae431dba0e1053cb5"
 dependencies = [
+ "axum",
  "base64 0.22.1",
  "channel-access-token-line",
  "hmac",
@@ -258,8 +260,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "channel-access-token-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c6d1f6a29b9e6db9e4f3ab53ef0e77cb11cf3735811d0a1aae55dc6a83b4b7c"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -1103,8 +1106,9 @@ dependencies = [
 
 [[package]]
 name = "insight-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9555ef2f8709112ff0824b432eb79a71b2f5ced2c88987bcb0e36555a0909a90"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -1157,8 +1161,9 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "liff-line"
-version = "1.0.0"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cac93030d120caac92953961fcc288740d59930c0a39bd9ed0dd929b7eece52d"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -1208,8 +1213,9 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "manage-audience-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b26782abe4e533092efc9eaf2ebff4bf03d3d61aa7493a500880af09e1798dd"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -1239,8 +1245,9 @@ checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 
 [[package]]
 name = "messaging-api-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "431e9d663f60ff7053bc79927bd544cc270d6601dced8738889c2495fc76efb1"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -1310,8 +1317,9 @@ dependencies = [
 
 [[package]]
 name = "module-attach-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c892c89c50ad3ae681fbf04e9764293a3dbfe1ad60f7e5a9b80b8593dd543b"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -1328,8 +1336,9 @@ dependencies = [
 
 [[package]]
 name = "module-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f14c1e7446315eb2c661de2620bcd2541364215be0119a898da0d1cb6b45989d"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -2169,8 +2178,9 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "shop-line"
-version = "0.0.1"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0d43fde231c22c4aae4358ff6c07d539ea877978ab34acfbf0ca12ca3679c76"
 dependencies = [
  "base64 0.7.0",
  "futures",
@@ -2938,8 +2948,9 @@ dependencies = [
 
 [[package]]
 name = "webhook-line"
-version = "1.0.0"
-source = "git+https://github.com/seichiki/bot_sdk_line.git#e2005f3fec62fd8d4ab62bef85b8c9f540a1834d"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2360afecb1ee365a36127c3b7455e4a54ea3c4eec5d59bf7cfd908e4643eac09"
 dependencies = [
  "base64 0.7.0",
  "futures",

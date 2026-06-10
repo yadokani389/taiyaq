@@ -14,6 +14,7 @@ async fn main() -> anyhow::Result<()> {
 
     let line_token =
         std::env::var("LINE_CHANNEL_ACCESS_TOKEN").expect("Missing LINE_CHANNEL_ACCESS_TOKEN");
+    std::env::var("LINE_CHANNEL_SECRET").expect("Missing LINE_CHANNEL_SECRET");
     std::env::var("STAFF_API_TOKEN").expect("Missing STAFF_API_TOKEN");
 
     let framework = discord::framework_builder()
