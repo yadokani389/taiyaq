@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
@@ -18,6 +18,17 @@ pub struct AppRegistry {
     data: Arc<RwLock<Data>>,
     pub line: Arc<Mutex<LINE>>,
     pub discord_ctx: Arc<Mutex<Context>>,
+}
+
+struct PendingNotification {
+    order_id: u32,
+    notify: Notify,
+    message: String,
+}
+
+struct StatusUpdate {
+    newly_ready_orders: Vec<u32>,
+    notifications: Vec<PendingNotification>,
 }
 
 impl AppRegistry {
@@ -55,8 +66,16 @@ impl AppRegistry {
     // Recalculates and updates the status for all orders based on current stock and demand.
     // This is the core logic for transitioning orders to 'Ready' or 'Cooking'.
     // Returns a list of order IDs that have newly become 'Ready'.
-    async fn update_order_statuses(&self, data: &mut Data) -> Vec<u32> {
+    fn update_order_statuses(data: &mut Data) -> StatusUpdate {
         let mut newly_ready_orders = Vec::new();
+        let mut notifications = Vec::new();
+
+        let previously_cooking_order_ids = data
+            .orders
+            .iter()
+            .filter(|o| o.status == OrderStatus::Cooking)
+            .map(|o| o.id)
+            .collect::<HashSet<_>>();
 
         // Part 1: Reset remaining Cooking orders to Waiting to prepare for recalculation
         for order in data
@@ -91,12 +110,11 @@ impl AppRegistry {
                 order.ready_at.replace(Utc::now());
                 newly_ready_orders.push(order.id);
                 for notify in &order.notify {
-                    self.send_notification(
-                        order.id,
-                        notify,
-                        format!("#{}番 のご注文の準備ができました！", order.id),
-                    )
-                    .await;
+                    notifications.push(PendingNotification {
+                        order_id: order.id,
+                        notify: notify.clone(),
+                        message: format!("#{}番 のご注文の準備ができました！", order.id),
+                    });
                 }
             }
         }
@@ -137,16 +155,17 @@ impl AppRegistry {
 
             if is_cooking {
                 order.status = OrderStatus::Cooking;
-                for notify in &order.notify {
-                    self.send_notification(
-                        order.id,
-                        notify,
-                        format!(
-                            "#{}番 調理中です！\n遠くにいる場合は近くでお待ちください。",
-                            order.id
-                        ),
-                    )
-                    .await;
+                if !previously_cooking_order_ids.contains(&order.id) {
+                    for notify in &order.notify {
+                        notifications.push(PendingNotification {
+                            order_id: order.id,
+                            notify: notify.clone(),
+                            message: format!(
+                                "#{}番 調理中です！\n遠くにいる場合は近くでお待ちください。",
+                                order.id
+                            ),
+                        });
+                    }
                 }
             }
 
@@ -156,7 +175,21 @@ impl AppRegistry {
             }
         }
 
-        newly_ready_orders
+        StatusUpdate {
+            newly_ready_orders,
+            notifications,
+        }
+    }
+
+    async fn send_notifications(&self, notifications: Vec<PendingNotification>) {
+        for notification in notifications {
+            self.send_notification(
+                notification.order_id,
+                &notification.notify,
+                notification.message,
+            )
+            .await;
+        }
     }
 
     pub async fn create_order(&self, items: Vec<Item>, is_priority: bool) -> Order {
@@ -175,13 +208,14 @@ impl AppRegistry {
         data.orders.push(new_order);
 
         // Recalculate statuses
-        self.update_order_statuses(&mut data).await;
+        let status_update = Self::update_order_statuses(&mut data);
 
         // Find the order we just added to return its (potentially updated) state
         let result_order = data.orders.iter().find(|o| o.id == new_id).unwrap().clone();
 
         drop(data);
         self.save_data().await.ok();
+        self.send_notifications(status_update.notifications).await;
         result_order
     }
 
@@ -195,7 +229,7 @@ impl AppRegistry {
         }
 
         // Recalculate statuses
-        let newly_ready_orders = self.update_order_statuses(&mut data).await;
+        let status_update = Self::update_order_statuses(&mut data);
 
         // Collect unallocated items for the response
         let unallocated_items = data
@@ -207,7 +241,8 @@ impl AppRegistry {
 
         drop(data);
         self.save_data().await.ok();
-        (newly_ready_orders, unallocated_items)
+        self.send_notifications(status_update.notifications).await;
+        (status_update.newly_ready_orders, unallocated_items)
     }
 
     // Helper to check if an order can be fulfilled from stock
@@ -238,7 +273,11 @@ impl AppRegistry {
             previous_status,
             OrderStatus::Waiting | OrderStatus::Cooking | OrderStatus::Ready
         ) {
-            self.update_order_statuses(&mut data).await;
+            let status_update = Self::update_order_statuses(&mut data);
+            drop(data);
+            self.save_data().await.ok();
+            self.send_notifications(status_update.notifications).await;
+            return Some(order);
         }
 
         drop(data);
@@ -277,7 +316,11 @@ impl AppRegistry {
         if stock_was_changed
             || matches!(previous_status, OrderStatus::Waiting | OrderStatus::Cooking)
         {
-            self.update_order_statuses(&mut data).await;
+            let status_update = Self::update_order_statuses(&mut data);
+            drop(data);
+            self.save_data().await.ok();
+            self.send_notifications(status_update.notifications).await;
+            return Some(cancelled_order);
         }
 
         drop(data);
@@ -297,12 +340,13 @@ impl AppRegistry {
         order.is_priority = is_priority;
 
         // Recalculate statuses as priority change can affect order processing sequence.
-        self.update_order_statuses(&mut data).await;
+        let status_update = Self::update_order_statuses(&mut data);
 
         let updated_order = data.orders.iter().find(|o| o.id == id).unwrap().clone();
 
         drop(data);
         self.save_data().await.ok();
+        self.send_notifications(status_update.notifications).await;
         Some(updated_order)
     }
 
@@ -463,8 +507,9 @@ impl AppRegistry {
     pub async fn set_flavor_config(&self, flavor: Flavor, config: FlavorConfig) {
         let mut data = self.data.write().await;
         data.flavor_configs[flavor] = config;
-        self.update_order_statuses(&mut data).await;
+        let status_update = Self::update_order_statuses(&mut data);
         drop(data);
         self.save_data().await.ok();
+        self.send_notifications(status_update.notifications).await;
     }
 }
