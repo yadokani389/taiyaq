@@ -1,10 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use strum::IntoEnumIterator;
 
-use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, Order, OrderStatus};
+use crate::domain::notification::NotificationDeliveryLog;
+use crate::domain::snapshot::{
+    Flavor, FlavorConfig, Item, Notify, Order, OrderStatus, OrderSystemSnapshot,
+};
+use crate::port::notification_log::NotificationLog;
+use crate::port::order_repository::OrderRepository;
 
 #[derive(Clone)]
 pub struct SqliteRepository {
@@ -16,15 +22,15 @@ impl SqliteRepository {
         Self { pool }
     }
 
-    pub async fn load(&self) -> anyhow::Result<Data> {
-        let mut data = Data::default();
+    async fn load_snapshot(&self) -> anyhow::Result<OrderSystemSnapshot> {
+        let mut snapshot = OrderSystemSnapshot::default();
 
         for row in sqlx::query!("SELECT flavor, unallocated_quantity FROM stock")
             .fetch_all(&self.pool)
             .await?
         {
             let flavor = Flavor::from_db_str(&required_column(row.flavor, "flavor")?)?;
-            data.unallocated_stock[flavor] = row.unallocated_quantity as usize;
+            snapshot.unallocated_stock[flavor] = row.unallocated_quantity as usize;
         }
 
         for row in sqlx::query!(
@@ -34,7 +40,7 @@ impl SqliteRepository {
         .await?
         {
             let flavor = Flavor::from_db_str(&required_column(row.flavor, "flavor")?)?;
-            data.flavor_configs[flavor] = FlavorConfig {
+            snapshot.flavor_configs[flavor] = FlavorConfig {
                 cooking_time_minutes: row.cooking_time_minutes as u32,
                 quantity_per_batch: row.quantity_per_batch as u32,
             };
@@ -79,7 +85,7 @@ impl SqliteRepository {
                 .insert(notify);
         }
 
-        data.orders = sqlx::query!(
+        snapshot.orders = sqlx::query!(
             "SELECT id, status, ordered_at, ready_at, completed_at, is_priority FROM orders ORDER BY id",
         )
         .fetch_all(&self.pool)
@@ -100,10 +106,10 @@ impl SqliteRepository {
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-        Ok(data)
+        Ok(snapshot)
     }
 
-    pub async fn save(&self, data: &Data) -> anyhow::Result<()> {
+    async fn replace_snapshot(&self, snapshot: &OrderSystemSnapshot) -> anyhow::Result<()> {
         let mut tx = self.pool.begin().await?;
 
         sqlx::query!("DELETE FROM notifications")
@@ -122,12 +128,12 @@ impl SqliteRepository {
             sqlx::query!(
                 "INSERT INTO stock (flavor, unallocated_quantity) VALUES (?, ?)",
                 flavor.as_db_str(),
-                data.unallocated_stock[flavor] as i64,
+                snapshot.unallocated_stock[flavor] as i64,
             )
             .execute(&mut *tx)
             .await?;
 
-            let config = data.flavor_configs[flavor];
+            let config = snapshot.flavor_configs[flavor];
             sqlx::query!(
                 "INSERT INTO flavor_configs (flavor, cooking_time_minutes, quantity_per_batch) VALUES (?, ?, ?)",
                 flavor.as_db_str(),
@@ -138,7 +144,7 @@ impl SqliteRepository {
             .await?;
         }
 
-        for order in &data.orders {
+        for order in &snapshot.orders {
             sqlx::query!(
                 "INSERT INTO orders (id, status, ordered_at, ready_at, completed_at, is_priority) VALUES (?, ?, ?, ?, ?, ?)",
                 order.id as i64,
@@ -193,6 +199,75 @@ impl SqliteRepository {
         tx.commit().await?;
         Ok(())
     }
+
+    async fn record_notification_delivery(
+        &self,
+        log: &NotificationDeliveryLog,
+    ) -> anyhow::Result<()> {
+        let attempted_at = format_datetime(Utc::now());
+        match &log.target {
+            Notify::Discord {
+                channel_id,
+                user_id,
+            } => {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO notification_delivery_logs
+                    (order_id, kind, discord_channel_id, discord_user_id, message, status, error_message, attempted_at)
+                    VALUES (?, 'discord', ?, ?, ?, ?, ?, ?)
+                    "#,
+                    log.order_id as i64,
+                    channel_id.to_string(),
+                    user_id.to_string(),
+                    log.message,
+                    log.status.as_db_str(),
+                    log.error_message,
+                    attempted_at,
+                )
+                .execute(&self.pool)
+                .await?;
+            }
+            Notify::Line { user_id } => {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO notification_delivery_logs
+                    (order_id, kind, line_user_id, message, status, error_message, attempted_at)
+                    VALUES (?, 'line', ?, ?, ?, ?, ?)
+                    "#,
+                    log.order_id as i64,
+                    user_id,
+                    log.message,
+                    log.status.as_db_str(),
+                    log.error_message,
+                    attempted_at,
+                )
+                .execute(&self.pool)
+                .await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl OrderRepository for SqliteRepository {
+    async fn load_snapshot(&self) -> anyhow::Result<OrderSystemSnapshot> {
+        SqliteRepository::load_snapshot(self).await
+    }
+
+    async fn replace_snapshot(&self, snapshot: &OrderSystemSnapshot) -> anyhow::Result<()> {
+        SqliteRepository::replace_snapshot(self, snapshot).await
+    }
+}
+
+#[async_trait]
+impl NotificationLog for SqliteRepository {
+    async fn record_notification_delivery(
+        &self,
+        log: &NotificationDeliveryLog,
+    ) -> anyhow::Result<()> {
+        SqliteRepository::record_notification_delivery(self, log).await
+    }
 }
 
 fn parse_datetime(value: String) -> anyhow::Result<DateTime<Utc>> {
@@ -209,4 +284,96 @@ fn required_column(value: Option<String>, name: &str) -> anyhow::Result<String> 
 
 fn format_datetime(value: DateTime<Utc>) -> String {
     value.to_rfc3339()
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
+
+    use crate::domain::notification::{NotificationDeliveryLog, NotificationDeliveryStatus};
+    use crate::domain::snapshot::{Notify, Order, OrderStatus, OrderSystemSnapshot};
+
+    use super::SqliteRepository;
+
+    async fn repository() -> anyhow::Result<(SqlitePool, SqliteRepository)> {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await?;
+        sqlx::migrate!("./migrations").run(&pool).await?;
+        let repository = SqliteRepository::new(pool.clone());
+        repository.replace_snapshot(&snapshot_with_order()).await?;
+        Ok((pool, repository))
+    }
+
+    fn snapshot_with_order() -> OrderSystemSnapshot {
+        OrderSystemSnapshot {
+            orders: vec![Order {
+                id: 1,
+                items: Vec::new(),
+                status: OrderStatus::Ready,
+                ordered_at: Utc::now(),
+                ready_at: Some(Utc::now()),
+                completed_at: None,
+                notify: Default::default(),
+                is_priority: false,
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn record_notification_delivery_records_line_result() -> anyhow::Result<()> {
+        let (pool, repository) = repository().await?;
+        let log = NotificationDeliveryLog {
+            order_id: 1,
+            target: Notify::Line {
+                user_id: "line-user".to_owned(),
+            },
+            message: "ready".to_owned(),
+            status: NotificationDeliveryStatus::Sent,
+            error_message: None,
+        };
+
+        repository.record_notification_delivery(&log).await?;
+
+        let (status, error_message) = latest_notification_delivery(&pool).await?;
+        assert_eq!(status, "sent");
+        assert_eq!(error_message, None);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn record_notification_delivery_records_discord_failure() -> anyhow::Result<()> {
+        let (pool, repository) = repository().await?;
+        let log = NotificationDeliveryLog {
+            order_id: 1,
+            target: Notify::Discord {
+                channel_id: 10,
+                user_id: 20,
+            },
+            message: "ready".to_owned(),
+            status: NotificationDeliveryStatus::Failed,
+            error_message: Some("network error".to_owned()),
+        };
+
+        repository.record_notification_delivery(&log).await?;
+
+        let (status, error_message) = latest_notification_delivery(&pool).await?;
+        assert_eq!(status, "failed");
+        assert_eq!(error_message, Some("network error".to_owned()));
+        Ok(())
+    }
+
+    async fn latest_notification_delivery(
+        pool: &SqlitePool,
+    ) -> anyhow::Result<(String, Option<String>)> {
+        let row = sqlx::query!(
+            "SELECT status, error_message FROM notification_delivery_logs ORDER BY id DESC LIMIT 1"
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok((row.status, row.error_message))
+    }
 }

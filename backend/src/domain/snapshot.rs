@@ -50,15 +50,14 @@ pub struct FlavorConfig {
     pub quantity_per_batch: u32,
 }
 
-// Data holds the core business data.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Data {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OrderSystemSnapshot {
     pub orders: Vec<Order>,
     pub unallocated_stock: EnumMap<Flavor, usize>,
     pub flavor_configs: EnumMap<Flavor, FlavorConfig>,
 }
 
-impl Default for Data {
+impl Default for OrderSystemSnapshot {
     fn default() -> Self {
         let flavor_configs = enum_map! {
             Flavor::Tsubuan => FlavorConfig {
@@ -123,7 +122,15 @@ impl OrderStatus {
         }
     }
 
+    pub fn from_api_str(value: &str) -> anyhow::Result<Self> {
+        Self::from_str(value)
+    }
+
     pub fn from_db_str(value: &str) -> anyhow::Result<Self> {
+        Self::from_str(value)
+    }
+
+    fn from_str(value: &str) -> anyhow::Result<Self> {
         match value {
             "waiting" => Ok(OrderStatus::Waiting),
             "cooking" => Ok(OrderStatus::Cooking),

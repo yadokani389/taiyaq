@@ -1,8 +1,8 @@
 use poise::serenity_prelude::*;
 
 use crate::{
-    data::{Flavor, FlavorConfig, Item, Notify, OrderStatus},
     discord::CREATE_CHANNEL,
+    domain::snapshot::{Flavor, FlavorConfig, Item, Notify, OrderStatus},
 };
 
 use super::PoiseContext;
@@ -18,7 +18,8 @@ pub async fn orders(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
 /// 公開ディスプレイ画面用の注文を取得します
 #[poise::command(slash_command)]
 async fn display(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
-    let orders = &ctx.data().data().await.orders;
+    let snapshot = ctx.data().snapshot().await?;
+    let orders = &snapshot.orders;
     let ready: Vec<_> = orders
         .iter()
         .filter(|o| o.status == OrderStatus::Ready)
@@ -78,7 +79,7 @@ async fn details(
     ctx: PoiseContext<'_>,
     #[description = "あなたの注文ID"] id: u32,
 ) -> Result<(), anyhow::Error> {
-    if let Some(details) = ctx.data().get_order_details(id).await {
+    if let Some(details) = ctx.data().get_order_details(id).await? {
         let response = format!(
             "注文 `{}`: ステータスは `{:?}` です。推定待ち時間: `{}`.",
             details.id,
@@ -101,8 +102,8 @@ async fn notify(
     #[description = "注文ID"] id: u32,
 ) -> Result<(), anyhow::Error> {
     let registry = ctx.data();
-    let data = registry.data().await;
-    let order = data.orders.iter().find(|o| o.id == id);
+    let snapshot = registry.snapshot().await?;
+    let order = snapshot.orders.iter().find(|o| o.id == id);
 
     if order.is_none() {
         let builder =
@@ -112,8 +113,6 @@ async fn notify(
     }
 
     let order = order.unwrap().clone();
-    drop(data);
-
     if order.status == OrderStatus::Completed || order.status == OrderStatus::Cancelled {
         let builder = poise::CreateReply::default().content(format!(
             "注文 `{}` はすでに完了/キャンセルされています。",
@@ -212,7 +211,7 @@ async fn notify(
 /// 現在の待ち時間を表示します
 #[poise::command(slash_command)]
 pub async fn waittime(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
-    let wait_times = ctx.data().get_current_wait_times().await;
+    let wait_times = ctx.data().get_current_wait_times().await?;
     let mut fields = Vec::new();
 
     for (flavor, time) in wait_times.wait_times {
@@ -293,8 +292,8 @@ async fn get_orders(
     #[description = "ステータスで絞り込み (カンマ区切り: waiting,cooking,ready,completed,cancelled)"]
     status: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let data = ctx.data().data().await;
-    let orders = &data.orders;
+    let snapshot = ctx.data().snapshot().await?;
+    let orders = &snapshot.orders;
 
     let statuses: Vec<OrderStatus> = if let Some(s) = status {
         s.split(',')
@@ -522,10 +521,10 @@ async fn update_order_priority(
 /// フレーバーの設定を取得します
 #[poise::command(slash_command)]
 async fn get_flavor_configs(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
-    let data = ctx.data().data().await;
+    let snapshot = ctx.data().snapshot().await?;
     let mut response = String::new();
     response.push_str("## フレーバー設定一覧\n");
-    for (flavor, config) in data.flavor_configs.iter() {
+    for (flavor, config) in snapshot.flavor_configs.iter() {
         response.push_str(&format!(
             "- **{}**: 調理時間: {}分, バッチ生産数: {}\n",
             flavor, config.cooking_time_minutes, config.quantity_per_batch

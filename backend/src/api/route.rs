@@ -13,7 +13,8 @@ use axum::{
     Router, middleware,
     routing::{get, post, put},
 };
-pub fn routes() -> Router<AppRegistry> {
+
+pub fn routes(registry: AppRegistry) -> Router {
     let user_routes = Router::new()
         .route("/orders/display", get(get_display_orders))
         .route("/orders/{id}", get(get_order_details))
@@ -28,9 +29,13 @@ pub fn routes() -> Router<AppRegistry> {
         .route("/staff/orders/{id}/notification", put(add_notification))
         .route("/staff/flavors/config", get(get_flavor_configs))
         .route("/staff/flavors/{flavor}", put(set_flavor_config))
-        .layer(middleware::from_fn(staff_api_auth));
+        .layer(middleware::from_fn_with_state(
+            registry.clone(),
+            staff_api_auth,
+        ));
     let line_router = Router::new().route("/line_callback", post(line_callback));
     Router::new()
         .nest("/api", user_routes.merge(staff_routes))
         .merge(line_router)
+        .with_state(registry)
 }

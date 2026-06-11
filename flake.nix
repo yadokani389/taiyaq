@@ -58,7 +58,7 @@
             done
           '';
         in
-        rec {
+        {
           _module.args.pkgs = import nixpkgs {
             inherit system;
             overlays = [ inputs.rust-overlay.overlays.default ];
@@ -66,20 +66,21 @@
 
           packages.taiyaq-backend = pkgs.callPackage ./backend/package.nix { inherit rustPlatform; };
 
-          packages.default = packages.taiyaq-backend;
+          packages.default = config.packages.taiyaq-backend;
 
           devShells.default = pkgs.mkShell {
             inputsFrom = [
               config.pre-commit.devShell
               config.process-compose."app".services.outputs.devShell
             ];
-            inherit (packages.default) buildInputs;
-            inherit (packages.default) nativeBuildInputs;
+            inherit (config.packages.default) buildInputs;
+            inherit (config.packages.default) nativeBuildInputs;
             packages = with pkgs; [
               rust-toolchain
               nodejs
               pnpm_10
               sqlx-cli
+              process-compose
             ];
           };
 

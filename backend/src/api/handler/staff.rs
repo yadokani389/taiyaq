@@ -4,21 +4,26 @@ use axum::{
     http::StatusCode,
 };
 use enum_map::EnumMap;
+use tracing::{error, info};
 
 use crate::{
     api::model::{
-        CreateOrderRequest, StaffOrdersQuery, UpdateOrderPriorityRequest, UpdateProductionRequest,
-        UpdateProductionResponse,
+        CreateOrderRequest, NotifyRequest, StaffOrderResponse, StaffOrdersQuery,
+        UpdateOrderPriorityRequest, UpdateProductionRequest, UpdateProductionResponse,
     },
     app::AppRegistry,
-    data::{Flavor, FlavorConfig, Notify, Order},
+    domain::snapshot::{Flavor, FlavorConfig},
 };
 /// GET /api/staff/orders
 pub async fn get_staff_orders(
     State(registry): State<AppRegistry>,
     Query(query): Query<StaffOrdersQuery>,
-) -> Json<Vec<Order>> {
-    let orders = &registry.data().await.orders;
+) -> Result<Json<Vec<StaffOrderResponse>>, StatusCode> {
+    let snapshot = registry.snapshot().await.map_err(|error| {
+        error!(?error, "failed to load orders");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let orders = &snapshot.orders;
     let filtered_orders = if query.status.is_empty() {
         orders.clone()
     } else {
@@ -28,29 +33,39 @@ pub async fn get_staff_orders(
             .cloned()
             .collect()
     };
-    Json(filtered_orders)
+    Ok(Json(
+        filtered_orders
+            .into_iter()
+            .map(StaffOrderResponse::from)
+            .collect(),
+    ))
 }
 
 /// POST /api/staff/orders
 pub async fn create_order(
     State(registry): State<AppRegistry>,
     Json(payload): Json<CreateOrderRequest>,
-) -> Result<(StatusCode, Json<Order>), StatusCode> {
-    println!("Creating order with items: {:?}", payload.items);
+) -> Result<(StatusCode, Json<StaffOrderResponse>), StatusCode> {
+    info!(items = ?payload.items, "creating order");
     let new_order = registry
         .create_order(payload.items, payload.is_priority.unwrap_or(false))
         .await
         .map_err(|error| {
-            eprintln!("Failed to save order: {error:?}");
+            error!(?error, "failed to save order");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    Ok((StatusCode::CREATED, Json(new_order)))
+    Ok((StatusCode::CREATED, Json(new_order.into())))
 }
 
 /// GET /api/staff/stock
-pub async fn get_stock(State(registry): State<AppRegistry>) -> Json<EnumMap<Flavor, usize>> {
-    let data = registry.data().await;
-    Json(data.unallocated_stock)
+pub async fn get_stock(
+    State(registry): State<AppRegistry>,
+) -> Result<Json<EnumMap<Flavor, usize>>, StatusCode> {
+    let snapshot = registry.snapshot().await.map_err(|error| {
+        error!(?error, "failed to load stock");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(snapshot.unallocated_stock))
 }
 
 /// POST /api/staff/production
@@ -62,7 +77,7 @@ pub async fn update_production(
         .update_production(payload.items)
         .await
         .map_err(|error| {
-        eprintln!("Failed to save production update: {error:?}");
+        error!(?error, "failed to save production update");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(UpdateProductionResponse {
@@ -75,12 +90,12 @@ pub async fn update_production(
 pub async fn complete_order(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
-) -> Result<Json<Order>, StatusCode> {
+) -> Result<Json<StaffOrderResponse>, StatusCode> {
     if let Some(order) = registry.complete_order(id).await.map_err(|error| {
-        eprintln!("Failed to save completed order: {error:?}");
+        error!(?error, order_id = id, "failed to save completed order");
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
-        Ok(Json(order))
+        Ok(Json(order.into()))
     } else {
         Err(StatusCode::NOT_FOUND)
     }
@@ -90,12 +105,12 @@ pub async fn complete_order(
 pub async fn cancel_order(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
-) -> Result<Json<Order>, StatusCode> {
+) -> Result<Json<StaffOrderResponse>, StatusCode> {
     if let Some(order) = registry.cancel_order(id).await.map_err(|error| {
-        eprintln!("Failed to save cancelled order: {error:?}");
+        error!(?error, order_id = id, "failed to save cancelled order");
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
-        Ok(Json(order))
+        Ok(Json(order.into()))
     } else {
         Err(StatusCode::NOT_FOUND)
     }
@@ -106,16 +121,20 @@ pub async fn update_order_priority(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
     Json(payload): Json<UpdateOrderPriorityRequest>,
-) -> Result<Json<Order>, StatusCode> {
+) -> Result<Json<StaffOrderResponse>, StatusCode> {
     if let Some(order) = registry
         .update_order_priority(id, payload.is_priority)
         .await
         .map_err(|error| {
-            eprintln!("Failed to save order priority update: {error:?}");
+            error!(
+                ?error,
+                order_id = id,
+                "failed to save order priority update"
+            );
             StatusCode::INTERNAL_SERVER_ERROR
         })?
     {
-        Ok(Json(order))
+        Ok(Json(order.into()))
     } else {
         Err(StatusCode::NOT_FOUND)
     }
@@ -125,17 +144,17 @@ pub async fn update_order_priority(
 pub async fn add_notification(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
-    Json(payload): Json<Notify>,
-) -> Result<Json<Order>, StatusCode> {
+    Json(payload): Json<NotifyRequest>,
+) -> Result<Json<StaffOrderResponse>, StatusCode> {
     if let Some(order) = registry
-        .add_notification(id, payload)
+        .add_notification(id, payload.into())
         .await
         .map_err(|error| {
-            eprintln!("Failed to save notification update: {error:?}");
+            error!(?error, order_id = id, "failed to save notification update");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
     {
-        Ok(Json(order))
+        Ok(Json(order.into()))
     } else {
         Err(StatusCode::NOT_FOUND)
     }
@@ -143,9 +162,12 @@ pub async fn add_notification(
 /// GET /api/staff/flavors/config
 pub async fn get_flavor_configs(
     State(registry): State<AppRegistry>,
-) -> Json<EnumMap<Flavor, FlavorConfig>> {
-    let data = registry.data().await;
-    Json(data.flavor_configs)
+) -> Result<Json<EnumMap<Flavor, FlavorConfig>>, StatusCode> {
+    let snapshot = registry.snapshot().await.map_err(|error| {
+        error!(?error, "failed to load flavor configs");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(snapshot.flavor_configs))
 }
 
 /// PUT /api/staff/flavors/{flavor}
@@ -158,7 +180,7 @@ pub async fn set_flavor_config(
         .set_flavor_config(flavor, config)
         .await
         .map_err(|error| {
-            eprintln!("Failed to save flavor config: {error:?}");
+            error!(?error, ?flavor, "failed to save flavor config");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(StatusCode::OK)

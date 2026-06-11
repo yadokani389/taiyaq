@@ -2,6 +2,7 @@ use bot_sdk_line::client::LINE;
 use bot_sdk_line::messaging_api_line::apis::MessagingApiApi;
 use bot_sdk_line::messaging_api_line::models::{Message, PushMessageRequest, TextMessageV2};
 use tokio::sync::MutexGuard;
+use tracing::{error, info};
 
 pub mod commands;
 pub mod handler;
@@ -27,10 +28,10 @@ pub async fn send_notification(line: MutexGuard<'_, LINE>, user_id: String, mess
         .await
     {
         Ok(_) => {
-            println!("✅ LINE notification sent to user {}", user_id);
+            info!(line_user_id = %user_id, "line notification sent");
         }
         Err(e) => {
-            eprintln!("Failed to send LINE notification to {}: {:?}", user_id, e);
+            error!(error = ?e, line_user_id = %user_id, "failed to send line notification");
         }
     }
 }

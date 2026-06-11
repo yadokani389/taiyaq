@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT status, error_message FROM notification_delivery_logs ORDER BY id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "status",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notification_delivery_logs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "error_message",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notification_delivery_logs",
+            "name": "error_message"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [false, true]
+  },
+  "hash": "42c5c552fa0f43475d68a67d31265af3078ca4f1896ed84b52e0aacfcb455cb1"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    INSERT INTO notification_delivery_logs\n                    (order_id, kind, discord_channel_id, discord_user_id, message, status, error_message, attempted_at)\n                    VALUES (?, 'discord', ?, ?, ?, ?, ?, ?)\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "94c1f77f6fa2ad16761506a498417559db4b40bedef9d1d02783b62959729a21"
+}

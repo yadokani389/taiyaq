@@ -1,5 +1,6 @@
 use axum::http::StatusCode;
 use bot_sdk_line::webhook_line::models::{CallbackRequest, Event, MessageContent, Source};
+use tracing::debug;
 
 use crate::app::AppRegistry;
 use crate::line::commands;
@@ -33,7 +34,7 @@ pub async fn line_handler(registry: &AppRegistry, req: CallbackRequest) -> Resul
                 commands::handle_postback(registry, reply_token, postback_data, user_id).await;
             }
             _ => {
-                println!("Unhandled event type: {:?}", e);
+                debug!(event = ?e, "unhandled line event type");
             }
         }
     }

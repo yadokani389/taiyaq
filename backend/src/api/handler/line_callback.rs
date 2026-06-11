@@ -9,15 +9,11 @@ pub async fn line_callback(
     Signature(signature): Signature,
     body: Bytes,
 ) -> StatusCode {
-    let Ok(channel_secret) = std::env::var("LINE_CHANNEL_SECRET") else {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    };
-
     let Ok(body_str) = std::str::from_utf8(&body) else {
         return StatusCode::BAD_REQUEST;
     };
 
-    if !validate_signature(&channel_secret, &signature, body_str) {
+    if !validate_signature(registry.line_channel_secret(), &signature, body_str) {
         return StatusCode::UNAUTHORIZED;
     }
 

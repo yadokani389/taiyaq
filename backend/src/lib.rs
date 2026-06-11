@@ -1,8 +1,9 @@
 pub mod api;
 pub mod app;
 pub mod config;
-pub mod data;
 pub mod discord;
+pub mod domain;
 pub mod line;
-pub mod service;
+pub mod port;
 pub mod storage;
+mod usecase;

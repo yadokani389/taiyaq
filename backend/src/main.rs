@@ -7,6 +7,7 @@ use taiyaq_backend::config::Config;
 use taiyaq_backend::discord;
 use taiyaq_backend::storage::{self, SqliteRepository};
 use tower_http::cors::{self, CorsLayer};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -35,14 +36,19 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await?;
 
-                let registry =
-                    AppRegistry::new(config.line_channel_access_token, ctx.clone(), repository);
-                let ret = registry.load_data().await;
-                tracing::info!(?ret, "loaded data");
+                let registry = AppRegistry::new(
+                    config.line_channel_access_token,
+                    config.line_channel_secret,
+                    config.staff_api_token,
+                    ctx.clone(),
+                    repository,
+                );
+                let ret = registry.initialize().await;
+                info!(?ret, "initialized registry");
 
-                let app = routes().with_state(registry.clone()).layer(cors());
+                let app = routes(registry.clone()).layer(cors());
 
-                tracing::info!(addr = %config.bind_addr, "listening");
+                info!(addr = %config.bind_addr, "listening");
                 let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
 
                 tokio::spawn(async move {

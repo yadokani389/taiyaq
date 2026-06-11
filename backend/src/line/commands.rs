@@ -1,15 +1,13 @@
-use bot_sdk_line::messaging_api_line::{
-    apis::MessagingApiApi,
-    models::{
-        Action, ButtonsTemplate, ConfirmTemplate, ImageMessage, Message, PostbackAction,
-        ReplyMessageRequest, TemplateMessage, TextMessageV2, template::Template,
-    },
+use bot_sdk_line::messaging_api_line::models::{
+    Action, ButtonsTemplate, ConfirmTemplate, ImageMessage, Message, PostbackAction,
+    TemplateMessage, TextMessageV2, template::Template,
 };
 
 use crate::{
     app::AppRegistry,
-    data::{Notify, OrderStatus},
+    domain::snapshot::{Notify, OrderStatus},
 };
+use tracing::error;
 // ========== 公開API: イベントハンドラー ==========
 
 /// コマンドを処理
@@ -97,11 +95,25 @@ pub async fn handle_postback(
 
 /// 注文状況を確認
 async fn handle_check_order_status(registry: &AppRegistry, reply_token: String, order_id: u32) {
-    if let Some(details) = registry.get_order_details(order_id).await {
-        let reply_text = format_order_details(&details);
-        send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
-    } else {
-        send_error_message(registry, reply_token, order_id, "が見つかりません").await;
+    match registry.get_order_details(order_id).await {
+        Ok(Some(details)) => {
+            let reply_text = format_order_details(&details);
+            send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
+        }
+        Ok(None) => {
+            send_error_message(registry, reply_token, order_id, "が見つかりません").await;
+        }
+        Err(error) => {
+            error!(?error, order_id, "failed to load line order details");
+            send_reply(
+                registry,
+                reply_token,
+                vec![create_text_message(
+                    "❌ エラー：注文情報を取得できませんでした。".to_string(),
+                )],
+            )
+            .await;
+        }
     }
 }
 
@@ -140,7 +152,7 @@ async fn handle_notification_confirm(
         )
         .await;
     } else if let Err(error) = result {
-        eprintln!("Failed to save LINE notification update: {error:?}");
+        error!(?error, order_id, "failed to save line notification update");
         send_reply(
             registry,
             reply_token,
@@ -206,7 +218,10 @@ async fn handle_notification_cancel(
             .await;
         }
         Err(error) => {
-            eprintln!("Failed to save LINE notification cancellation: {error:?}");
+            error!(
+                ?error,
+                order_id, "failed to save line notification cancellation"
+            );
             send_reply(
                 registry,
                 reply_token,
@@ -252,7 +267,7 @@ async fn handle_adding_notification(
     }
 
     match registry.get_order_details(order_id).await {
-        Some(details)
+        Ok(Some(details))
             if !matches!(
                 details.status,
                 OrderStatus::Completed | OrderStatus::Cancelled
@@ -269,7 +284,7 @@ async fn handle_adding_notification(
             )
             .await;
         }
-        Some(_) => {
+        Ok(Some(_)) => {
             send_reply(
                 registry,
                 reply_token,
@@ -280,16 +295,35 @@ async fn handle_adding_notification(
             )
             .await;
         }
-        None => {
+        Ok(None) => {
             send_error_message(registry, reply_token, order_id, "が見つかりません").await;
+        }
+        Err(error) => {
+            error!(
+                ?error,
+                order_id, "failed to load line notification order details"
+            );
+            send_reply(
+                registry,
+                reply_token,
+                vec![create_text_message(
+                    "❌ エラー：注文情報を取得できませんでした。".to_string(),
+                )],
+            )
+            .await;
         }
     }
 }
 
 /// 待ち時間を表示
 async fn handle_show_waittime(registry: &AppRegistry, reply_token: String) {
-    let wait_times = registry.get_current_wait_times().await;
-    let reply_text = format_wait_times(&wait_times);
+    let reply_text = match registry.get_current_wait_times().await {
+        Ok(wait_times) => format_wait_times(&wait_times),
+        Err(error) => {
+            error!(?error, "failed to load line wait times");
+            "❌ エラー：待ち時間を取得できませんでした。".to_string()
+        }
+    };
     send_reply(registry, reply_token, vec![create_text_message(reply_text)]).await;
 }
 
@@ -455,21 +489,8 @@ fn create_notification_confirm_template(
 
 /// メッセージを返信
 async fn send_reply(registry: &AppRegistry, reply_token: String, messages: Vec<Message>) {
-    let reply_message_request = ReplyMessageRequest {
-        reply_token,
-        messages,
-        notification_disabled: Some(false),
-    };
-
-    if let Err(e) = registry
-        .line
-        .lock()
-        .await
-        .messaging_api_client
-        .reply_message(reply_message_request)
-        .await
-    {
-        eprintln!("Failed to send reply: {:?}", e);
+    if let Err(e) = registry.reply_line_message(reply_token, messages).await {
+        error!(error = ?e, "failed to send line reply");
     }
 }
 
