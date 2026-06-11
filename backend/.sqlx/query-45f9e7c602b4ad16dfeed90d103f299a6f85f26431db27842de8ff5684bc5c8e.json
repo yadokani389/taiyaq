@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM order_items",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "45f9e7c602b4ad16dfeed90d103f299a6f85f26431db27842de8ff5684bc5c8e"
+}

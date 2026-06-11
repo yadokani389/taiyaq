@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO notifications (order_id, kind, line_user_id) VALUES (?, 'line', ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "bcc7dd04856f86a6d860f1b8ee1476824293fc028d23aec192957d0b53eb21bd"
+}

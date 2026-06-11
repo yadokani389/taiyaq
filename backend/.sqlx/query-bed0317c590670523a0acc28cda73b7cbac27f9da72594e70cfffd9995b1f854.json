@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO orders (id, status, ordered_at, ready_at, completed_at, is_priority) VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "bed0317c590670523a0acc28cda73b7cbac27f9da72594e70cfffd9995b1f854"
+}

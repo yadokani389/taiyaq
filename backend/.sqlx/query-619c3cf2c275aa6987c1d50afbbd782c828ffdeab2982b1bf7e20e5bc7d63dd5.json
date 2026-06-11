@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO flavor_configs (flavor, cooking_time_minutes, quantity_per_batch) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "619c3cf2c275aa6987c1d50afbbd782c828ffdeab2982b1bf7e20e5bc7d63dd5"
+}

@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use bot_sdk_line::client::LINE;
@@ -10,51 +9,36 @@ use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
 use crate::api::model::{OrderDetailsResponse, WaitTimeResponse};
 use crate::data::{Data, Flavor, FlavorConfig, Item, Notify, Order, OrderStatus};
+use crate::service::order_status;
+use crate::storage::SqliteRepository;
 use crate::{discord, line};
 
 // AppRegistry is the main application state.
 #[derive(Clone)]
 pub struct AppRegistry {
     data: Arc<RwLock<Data>>,
+    repository: Arc<SqliteRepository>,
     pub line: Arc<Mutex<LINE>>,
     pub discord_ctx: Arc<Mutex<Context>>,
 }
 
-struct PendingNotification {
-    order_id: u32,
-    notify: Notify,
-    message: String,
-}
-
-struct StatusUpdate {
-    newly_ready_orders: Vec<u32>,
-    notifications: Vec<PendingNotification>,
-}
-
 impl AppRegistry {
-    const FILE_PATH: &str = "data.json";
-
-    pub fn new(line_token: String, ctx: Context) -> Self {
+    pub fn new(line_token: String, ctx: Context, repository: SqliteRepository) -> Self {
         Self {
             data: Arc::new(RwLock::new(Data::default())),
+            repository: Arc::new(repository),
             line: Arc::new(Mutex::new(LINE::new(line_token))),
             discord_ctx: Arc::new(Mutex::new(ctx)),
         }
     }
 
     pub async fn save_data(&self) -> anyhow::Result<()> {
-        let data_str = serde_json::to_string_pretty(&*self.data.read().await)?;
-        tokio::fs::write(Self::FILE_PATH, data_str).await?;
+        self.repository.save(&*self.data.read().await).await?;
         Ok(())
     }
 
     pub async fn load_data(&self) -> anyhow::Result<()> {
-        let Ok(data_str) = tokio::fs::read_to_string(Self::FILE_PATH).await else {
-            let data_str = serde_json::to_string_pretty(&Data::default())?;
-            tokio::fs::write(Self::FILE_PATH, data_str).await?;
-            return Ok(());
-        };
-        let data: Data = serde_json::from_str(&data_str)?;
+        let data = self.repository.load().await?;
         *self.data.write().await = data;
         Ok(())
     }
@@ -63,125 +47,7 @@ impl AppRegistry {
         self.data.read().await
     }
 
-    // Recalculates and updates the status for all orders based on current stock and demand.
-    // This is the core logic for transitioning orders to 'Ready' or 'Cooking'.
-    // Returns a list of order IDs that have newly become 'Ready'.
-    fn update_order_statuses(data: &mut Data) -> StatusUpdate {
-        let mut newly_ready_orders = Vec::new();
-        let mut notifications = Vec::new();
-
-        let previously_cooking_order_ids = data
-            .orders
-            .iter()
-            .filter(|o| o.status == OrderStatus::Cooking)
-            .map(|o| o.id)
-            .collect::<HashSet<_>>();
-
-        // Part 1: Reset remaining Cooking orders to Waiting to prepare for recalculation
-        for order in data
-            .orders
-            .iter_mut()
-            .filter(|o| o.status == OrderStatus::Cooking)
-        {
-            order.status = OrderStatus::Waiting;
-        }
-
-        // Part 2: Fulfill what can be fulfilled now (Waiting -> Ready)
-        let mut stock = std::mem::take(&mut data.unallocated_stock);
-
-        // Create a list of order indices to iterate over, to avoid borrowing issues.
-        let mut waiting_order_indices: Vec<usize> = data
-            .orders
-            .iter()
-            .enumerate()
-            .filter(|(_, o)| o.status == OrderStatus::Waiting)
-            .map(|(i, _)| i)
-            .collect();
-
-        // Sort indices by priority (true first, so use reverse) and then by ordered_at.
-        waiting_order_indices
-            .sort_by_key(|&i| (!data.orders[i].is_priority, data.orders[i].ordered_at));
-
-        for index in waiting_order_indices {
-            let order = &mut data.orders[index];
-            if Self::can_fulfill(order, &stock) {
-                Self::fulfill(order, &mut stock);
-                order.status = OrderStatus::Ready;
-                order.ready_at.replace(Utc::now());
-                newly_ready_orders.push(order.id);
-                for notify in &order.notify {
-                    notifications.push(PendingNotification {
-                        order_id: order.id,
-                        notify: notify.clone(),
-                        message: format!("#{}番 のご注文の準備ができました！", order.id),
-                    });
-                }
-            }
-        }
-        data.unallocated_stock = stock; // Put the remaining stock back
-
-        // Part 3: Find new 'Cooking' orders from the now-complete 'Waiting' pool
-        let mut waiting_orders: Vec<&mut Order> = data
-            .orders
-            .iter_mut()
-            .filter(|o| o.status == OrderStatus::Waiting)
-            .collect();
-        // Sort by priority (true first, so use reverse), then by time.
-        waiting_orders.sort_by_key(|o| (!o.is_priority, o.ordered_at));
-
-        let mut cumulative_demand: HashMap<Flavor, usize> = HashMap::new();
-
-        for order in waiting_orders {
-            let mut is_cooking = !order.items.is_empty();
-
-            for item in &order.items {
-                let demand_so_far = cumulative_demand.get(&item.flavor).copied().unwrap_or(0);
-                let current_stock = data.unallocated_stock[item.flavor];
-
-                // How many items need to be produced to fulfill demand up to this point (including current item)
-                let total_demand_for_item = demand_so_far + item.quantity;
-                let needed_from_production = total_demand_for_item.saturating_sub(current_stock);
-
-                if needed_from_production > 0 {
-                    let config = data.flavor_configs[item.flavor];
-                    // If the items needed from production exceed what the first batch can provide,
-                    // then this order is not in the "cooking" phase.
-                    if needed_from_production > config.quantity_per_batch as usize {
-                        is_cooking = false;
-                        break; // No need to check other items in this order
-                    }
-                }
-            }
-
-            if is_cooking {
-                order.status = OrderStatus::Cooking;
-                if !previously_cooking_order_ids.contains(&order.id) {
-                    for notify in &order.notify {
-                        notifications.push(PendingNotification {
-                            order_id: order.id,
-                            notify: notify.clone(),
-                            message: format!(
-                                "#{}番 調理中です！\n遠くにいる場合は近くでお待ちください。",
-                                order.id
-                            ),
-                        });
-                    }
-                }
-            }
-
-            // Update cumulative demand for the next iteration
-            for item in &order.items {
-                *cumulative_demand.entry(item.flavor).or_insert(0) += item.quantity;
-            }
-        }
-
-        StatusUpdate {
-            newly_ready_orders,
-            notifications,
-        }
-    }
-
-    async fn send_notifications(&self, notifications: Vec<PendingNotification>) {
+    async fn send_notifications(&self, notifications: Vec<order_status::PendingNotification>) {
         for notification in notifications {
             self.send_notification(
                 notification.order_id,
@@ -208,7 +74,7 @@ impl AppRegistry {
         data.orders.push(new_order);
 
         // Recalculate statuses
-        let status_update = Self::update_order_statuses(&mut data);
+        let status_update = order_status::update_order_statuses(&mut data);
 
         // Find the order we just added to return its (potentially updated) state
         let result_order = data.orders.iter().find(|o| o.id == new_id).unwrap().clone();
@@ -232,7 +98,7 @@ impl AppRegistry {
         }
 
         // Recalculate statuses
-        let status_update = Self::update_order_statuses(&mut data);
+        let status_update = order_status::update_order_statuses(&mut data);
 
         // Collect unallocated items for the response
         let unallocated_items = data
@@ -246,21 +112,6 @@ impl AppRegistry {
         self.save_data().await?;
         self.send_notifications(status_update.notifications).await;
         Ok((status_update.newly_ready_orders, unallocated_items))
-    }
-
-    // Helper to check if an order can be fulfilled from stock
-    fn can_fulfill(order: &Order, stock: &EnumMap<Flavor, usize>) -> bool {
-        order
-            .items
-            .iter()
-            .all(|item| stock[item.flavor] >= item.quantity)
-    }
-
-    // Helper to decrement stock for a fulfilled order
-    fn fulfill(order: &Order, stock: &mut EnumMap<Flavor, usize>) {
-        for item in &order.items {
-            stock[item.flavor] -= item.quantity;
-        }
     }
 
     pub async fn complete_order(&self, id: u32) -> anyhow::Result<Option<Order>> {
@@ -278,7 +129,7 @@ impl AppRegistry {
             previous_status,
             OrderStatus::Waiting | OrderStatus::Cooking | OrderStatus::Ready
         ) {
-            let status_update = Self::update_order_statuses(&mut data);
+            let status_update = order_status::update_order_statuses(&mut data);
             drop(data);
             self.save_data().await?;
             self.send_notifications(status_update.notifications).await;
@@ -323,7 +174,7 @@ impl AppRegistry {
         if stock_was_changed
             || matches!(previous_status, OrderStatus::Waiting | OrderStatus::Cooking)
         {
-            let status_update = Self::update_order_statuses(&mut data);
+            let status_update = order_status::update_order_statuses(&mut data);
             drop(data);
             self.save_data().await?;
             self.send_notifications(status_update.notifications).await;
@@ -353,7 +204,7 @@ impl AppRegistry {
         order.is_priority = is_priority;
 
         // Recalculate statuses as priority change can affect order processing sequence.
-        let status_update = Self::update_order_statuses(&mut data);
+        let status_update = order_status::update_order_statuses(&mut data);
 
         let updated_order = data.orders.iter().find(|o| o.id == id).unwrap().clone();
 
@@ -536,7 +387,7 @@ impl AppRegistry {
     ) -> anyhow::Result<()> {
         let mut data = self.data.write().await;
         data.flavor_configs[flavor] = config;
-        let status_update = Self::update_order_statuses(&mut data);
+        let status_update = order_status::update_order_statuses(&mut data);
         drop(data);
         self.save_data().await?;
         self.send_notifications(status_update.notifications).await;

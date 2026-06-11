@@ -45,10 +45,15 @@
             rustc = rust-toolchain;
           };
 
+          databasePath = "data/taiyaq.sqlite";
+          databaseUrl = "sqlite://${databasePath}";
+
           backup = pkgs.writeShellScriptBin "backup" ''
             mkdir -p backups
             while true; do
-              cp data.json backups/data_$(date +%Y%m%d_%H%M).json
+              db_path=''${DATABASE_URL#sqlite://}
+              db_path=''${db_path:-${databasePath}}
+              ${pkgs.sqlite}/bin/sqlite3 "$db_path" ".backup 'backups/taiyaq_$(date +%Y%m%d_%H%M).sqlite'"
               sleep 600
             done
           '';
@@ -74,6 +79,7 @@
               rust-toolchain
               nodejs
               pnpm_10
+              sqlx-cli
             ];
           };
 
@@ -123,6 +129,7 @@
               extraPackages = with pkgs; [
                 openssl
                 pkg-config
+                sqlx-cli
               ];
             };
           };
@@ -135,8 +142,8 @@
             cli.options.no-server = false;
             settings = {
               processes = {
-                backend-server.command = lib.getExe config.packages.taiyaq-backend;
-                backup.command = lib.getExe backup;
+                backend-server.command = "DATABASE_URL=${databaseUrl} ${lib.getExe config.packages.taiyaq-backend}";
+                backup.command = "DATABASE_URL=${databaseUrl} ${lib.getExe backup}";
                 staff-panel.command = "${lib.getExe pkgs.serve} -s frontend/staff-panel/dist -l 38001";
                 display-screen.command = "${lib.getExe pkgs.serve} -s frontend/display-screen/dist -l 38002";
                 user-display.command = "${lib.getExe pkgs.serve} -s frontend/user-display/dist -l 38003";

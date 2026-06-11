@@ -1,46 +1,49 @@
-use std::net::SocketAddr;
-
 use axum::http::{HeaderName, Method};
 use dotenvy::dotenv;
 use poise::serenity_prelude::*;
 use taiyaq_backend::api::route::routes;
 use taiyaq_backend::app::AppRegistry;
+use taiyaq_backend::config::Config;
 use taiyaq_backend::discord;
+use taiyaq_backend::storage::{self, SqliteRepository};
 use tower_http::cors::{self, CorsLayer};
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
-    let line_token =
-        std::env::var("LINE_CHANNEL_ACCESS_TOKEN").expect("Missing LINE_CHANNEL_ACCESS_TOKEN");
-    std::env::var("LINE_CHANNEL_SECRET").expect("Missing LINE_CHANNEL_SECRET");
-    std::env::var("STAFF_API_TOKEN").expect("Missing STAFF_API_TOKEN");
+    let config = Config::from_env()?;
+    let pool = storage::connect(&config.database_url).await?;
+    let repository = SqliteRepository::new(pool);
+    let setup_config = config.clone();
+    let discord_token = config.discord_token.clone();
 
     let framework = discord::framework_builder()
-        .setup(|ctx, _ready, _framework| {
+        .setup(move |ctx, _ready, _framework| {
+            let config = setup_config.clone();
+            let repository = repository.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &discord::global_commands()).await?;
-                let guild_id: u64 = std::env::var("DISCORD_GUILD_ID")
-                    .expect("Missing DISCORD_GUILD_ID")
-                    .parse()
-                    .expect("DISCORD_GUILD_ID must be a valid u64");
                 poise::builtins::register_in_guild(
                     ctx,
                     &discord::guild_commands(),
-                    guild_id.into(),
+                    config.discord_guild_id.into(),
                 )
                 .await?;
 
-                let registry = AppRegistry::new(line_token, ctx.clone());
+                let registry =
+                    AppRegistry::new(config.line_channel_access_token, ctx.clone(), repository);
                 let ret = registry.load_data().await;
-                println!("Load data result: {:?}", ret);
+                tracing::info!(?ret, "loaded data");
 
                 let app = routes().with_state(registry.clone()).layer(cors());
 
-                let addr = SocketAddr::from(([0, 0, 0, 0], 38000));
-                println!("listening on {}", addr);
-                let listener = tokio::net::TcpListener::bind(addr).await?;
+                tracing::info!(addr = %config.bind_addr, "listening");
+                let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
 
                 tokio::spawn(async move {
                     axum::serve(listener, app)
@@ -53,10 +56,9 @@ async fn main() -> anyhow::Result<()> {
         })
         .build();
 
-    let token = std::env::var("DISCORD_TOKEN").expect("Missing DISCORD_TOKEN");
     let intents = GatewayIntents::non_privileged();
 
-    let client = ClientBuilder::new(token, intents)
+    let client = ClientBuilder::new(discord_token, intents)
         .framework(framework)
         .await;
     client

@@ -1,0 +1,79 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, status, ordered_at, ready_at, completed_at, is_priority FROM orders ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "ordered_at",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "ordered_at"
+          }
+        }
+      },
+      {
+        "name": "ready_at",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "ready_at"
+          }
+        }
+      },
+      {
+        "name": "completed_at",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "completed_at"
+          }
+        }
+      },
+      {
+        "name": "is_priority",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "is_priority"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [false, false, false, true, true, false]
+  },
+  "hash": "e97296ec455e832505739b643739156e81190d6bf6d0d73f43958cdd0b994731"
+}

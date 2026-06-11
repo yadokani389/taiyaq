@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO stock (flavor, unallocated_quantity) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "79227c337aed87862133be7c0fe7dec56a7bdf88f33e6b72e0436313e64d71cd"
+}

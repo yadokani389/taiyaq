@@ -1,0 +1,46 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT order_id, flavor, quantity FROM order_items",
+  "describe": {
+    "columns": [
+      {
+        "name": "order_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "order_items",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "name": "flavor",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_items",
+            "name": "flavor"
+          }
+        }
+      },
+      {
+        "name": "quantity",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "order_items",
+            "name": "quantity"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [false, false, false]
+  },
+  "hash": "708fd56508db017813c50672c31beb2fc5da88328f9fc913cdb6bee5968d37e6"
+}

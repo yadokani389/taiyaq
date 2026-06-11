@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT flavor, unallocated_quantity FROM stock",
+  "describe": {
+    "columns": [
+      {
+        "name": "flavor",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stock",
+            "name": "flavor"
+          }
+        }
+      },
+      {
+        "name": "unallocated_quantity",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stock",
+            "name": "unallocated_quantity"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [true, false]
+  },
+  "hash": "68724bf62be752f59f1500504cacb16716cb6a15da1044e9488e0bddd7e02b47"
+}

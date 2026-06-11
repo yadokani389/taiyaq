@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT order_id, kind, discord_channel_id, discord_user_id, line_user_id FROM notifications",
+  "describe": {
+    "columns": [
+      {
+        "name": "order_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "notifications",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notifications",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "discord_channel_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notifications",
+            "name": "discord_channel_id"
+          }
+        }
+      },
+      {
+        "name": "discord_user_id",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notifications",
+            "name": "discord_user_id"
+          }
+        }
+      },
+      {
+        "name": "line_user_id",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notifications",
+            "name": "line_user_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [false, false, true, true, true]
+  },
+  "hash": "414947fc93791e1a7e1c535ff16a320ad57e38d677a1df32b02fa13a60f4111d"
+}

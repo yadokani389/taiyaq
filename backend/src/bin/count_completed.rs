@@ -1,11 +1,14 @@
 use enum_map::EnumMap;
-use std::fs;
 use strum::IntoEnumIterator;
-use taiyaq_backend::data::{Data, Flavor, OrderStatus};
+use taiyaq_backend::data::{Flavor, OrderStatus};
+use taiyaq_backend::storage::{self, SqliteRepository};
 
-fn main() -> anyhow::Result<()> {
-    let data_str = fs::read_to_string("data.json")?;
-    let data: Data = serde_json::from_str(&data_str)?;
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://data/taiyaq.sqlite".to_string());
+    let repository = SqliteRepository::new(storage::connect(&database_url).await?);
+    let data = repository.load().await?;
 
     let mut flavor_counts = EnumMap::from_fn(|_| 0);
 

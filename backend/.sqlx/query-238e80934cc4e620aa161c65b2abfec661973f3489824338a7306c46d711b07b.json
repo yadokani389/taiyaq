@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO notifications (order_id, kind, discord_channel_id, discord_user_id) VALUES (?, 'discord', ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "238e80934cc4e620aa161c65b2abfec661973f3489824338a7306c46d711b07b"
+}

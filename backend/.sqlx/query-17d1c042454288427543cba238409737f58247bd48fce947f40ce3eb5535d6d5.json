@@ -1,0 +1,46 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT flavor, cooking_time_minutes, quantity_per_batch FROM flavor_configs",
+  "describe": {
+    "columns": [
+      {
+        "name": "flavor",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flavor_configs",
+            "name": "flavor"
+          }
+        }
+      },
+      {
+        "name": "cooking_time_minutes",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flavor_configs",
+            "name": "cooking_time_minutes"
+          }
+        }
+      },
+      {
+        "name": "quantity_per_batch",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flavor_configs",
+            "name": "quantity_per_batch"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [true, false, false]
+  },
+  "hash": "17d1c042454288427543cba238409737f58247bd48fce947f40ce3eb5535d6d5"
+}

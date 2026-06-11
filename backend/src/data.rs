@@ -24,6 +24,25 @@ impl fmt::Display for Flavor {
     }
 }
 
+impl Flavor {
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Flavor::Tsubuan => "tsubuan",
+            Flavor::Custard => "custard",
+            Flavor::Kurikinton => "kurikinton",
+        }
+    }
+
+    pub fn from_db_str(value: &str) -> anyhow::Result<Self> {
+        match value {
+            "tsubuan" => Ok(Flavor::Tsubuan),
+            "custard" => Ok(Flavor::Custard),
+            "kurikinton" => Ok(Flavor::Kurikinton),
+            _ => anyhow::bail!("invalid flavor: {value}"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct FlavorConfig {
@@ -91,6 +110,29 @@ pub enum OrderStatus {
     Ready,
     Completed,
     Cancelled,
+}
+
+impl OrderStatus {
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            OrderStatus::Waiting => "waiting",
+            OrderStatus::Cooking => "cooking",
+            OrderStatus::Ready => "ready",
+            OrderStatus::Completed => "completed",
+            OrderStatus::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_db_str(value: &str) -> anyhow::Result<Self> {
+        match value {
+            "waiting" => Ok(OrderStatus::Waiting),
+            "cooking" => Ok(OrderStatus::Cooking),
+            "ready" => Ok(OrderStatus::Ready),
+            "completed" => Ok(OrderStatus::Completed),
+            "cancelled" => Ok(OrderStatus::Cancelled),
+            _ => anyhow::bail!("invalid order status: {value}"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]

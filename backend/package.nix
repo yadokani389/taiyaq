@@ -34,6 +34,8 @@ rustPlatform.buildRustPackage {
 
   doCheck = false;
 
+  SQLX_OFFLINE = "true";
+
   meta = {
     mainProgram = "taiyaq-backend";
     license = with lib.licenses; [
