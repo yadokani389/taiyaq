@@ -35,12 +35,16 @@ pub async fn get_staff_orders(
 pub async fn create_order(
     State(registry): State<AppRegistry>,
     Json(payload): Json<CreateOrderRequest>,
-) -> (StatusCode, Json<Order>) {
+) -> Result<(StatusCode, Json<Order>), StatusCode> {
     println!("Creating order with items: {:?}", payload.items);
     let new_order = registry
         .create_order(payload.items, payload.is_priority.unwrap_or(false))
-        .await;
-    (StatusCode::CREATED, Json(new_order))
+        .await
+        .map_err(|error| {
+            eprintln!("Failed to save order: {error:?}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok((StatusCode::CREATED, Json(new_order)))
 }
 
 /// GET /api/staff/stock
@@ -53,12 +57,18 @@ pub async fn get_stock(State(registry): State<AppRegistry>) -> Json<EnumMap<Flav
 pub async fn update_production(
     State(registry): State<AppRegistry>,
     Json(payload): Json<UpdateProductionRequest>,
-) -> Json<UpdateProductionResponse> {
-    let (newly_ready_orders, unallocated_items) = registry.update_production(payload.items).await;
-    Json(UpdateProductionResponse {
+) -> Result<Json<UpdateProductionResponse>, StatusCode> {
+    let (newly_ready_orders, unallocated_items) = registry
+        .update_production(payload.items)
+        .await
+        .map_err(|error| {
+        eprintln!("Failed to save production update: {error:?}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(UpdateProductionResponse {
         newly_ready_orders,
         unallocated_items,
-    })
+    }))
 }
 
 /// POST /api/staff/orders/{id}/complete
@@ -66,7 +76,10 @@ pub async fn complete_order(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
 ) -> Result<Json<Order>, StatusCode> {
-    if let Some(order) = registry.complete_order(id).await {
+    if let Some(order) = registry.complete_order(id).await.map_err(|error| {
+        eprintln!("Failed to save completed order: {error:?}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })? {
         Ok(Json(order))
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -78,7 +91,10 @@ pub async fn cancel_order(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
 ) -> Result<Json<Order>, StatusCode> {
-    if let Some(order) = registry.cancel_order(id).await {
+    if let Some(order) = registry.cancel_order(id).await.map_err(|error| {
+        eprintln!("Failed to save cancelled order: {error:?}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })? {
         Ok(Json(order))
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -94,6 +110,10 @@ pub async fn update_order_priority(
     if let Some(order) = registry
         .update_order_priority(id, payload.is_priority)
         .await
+        .map_err(|error| {
+            eprintln!("Failed to save order priority update: {error:?}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
     {
         Ok(Json(order))
     } else {
@@ -107,7 +127,14 @@ pub async fn add_notification(
     Path(id): Path<u32>,
     Json(payload): Json<Notify>,
 ) -> Result<Json<Order>, StatusCode> {
-    if let Some(order) = registry.add_notification(id, payload).await {
+    if let Some(order) = registry
+        .add_notification(id, payload)
+        .await
+        .map_err(|error| {
+            eprintln!("Failed to save notification update: {error:?}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+    {
         Ok(Json(order))
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -126,7 +153,13 @@ pub async fn set_flavor_config(
     State(registry): State<AppRegistry>,
     Path(flavor): Path<Flavor>,
     Json(config): Json<FlavorConfig>,
-) -> StatusCode {
-    registry.set_flavor_config(flavor, config).await;
-    StatusCode::OK
+) -> Result<StatusCode, StatusCode> {
+    registry
+        .set_flavor_config(flavor, config)
+        .await
+        .map_err(|error| {
+            eprintln!("Failed to save flavor config: {error:?}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(StatusCode::OK)
 }

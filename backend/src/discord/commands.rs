@@ -181,7 +181,7 @@ async fn notify(
                     channel_id: ctx.channel_id().into(),
                     user_id: ctx.author().id.into(),
                 };
-                if registry.add_notification(id, payload).await.is_some() {
+                if registry.add_notification(id, payload).await?.is_some() {
                     (
                         "通知を登録しました。準備ができたらメンションでお知らせします。",
                         Colour::DARK_GREEN,
@@ -394,7 +394,7 @@ async fn create_order(
     let new_order = ctx
         .data()
         .create_order(parsed_items, is_priority.unwrap_or(false))
-        .await;
+        .await?;
 
     ctx.say(format!("新しい注文を作成しました。ID: {}", new_order.id))
         .await?;
@@ -438,7 +438,8 @@ async fn update_production(
         return Ok(());
     }
 
-    let (newly_ready_orders, unallocated_items) = ctx.data().update_production(parsed_items).await;
+    let (newly_ready_orders, unallocated_items) =
+        ctx.data().update_production(parsed_items).await?;
 
     let ready_str = if newly_ready_orders.is_empty() {
         "なし".to_string()
@@ -475,7 +476,7 @@ async fn complete_order(
     ctx: PoiseContext<'_>,
     #[description = "注文ID"] id: u32,
 ) -> Result<(), anyhow::Error> {
-    if let Some(order) = ctx.data().complete_order(id).await {
+    if let Some(order) = ctx.data().complete_order(id).await? {
         ctx.say(format!("注文 `{}` を完了にしました。", order.id))
             .await?;
     } else {
@@ -490,7 +491,7 @@ async fn cancel_order(
     ctx: PoiseContext<'_>,
     #[description = "注文ID"] id: u32,
 ) -> Result<(), anyhow::Error> {
-    if let Some(order) = ctx.data().cancel_order(id).await {
+    if let Some(order) = ctx.data().cancel_order(id).await? {
         ctx.say(format!("注文 `{}` をキャンセルしました。", order.id))
             .await?;
     } else {
@@ -506,7 +507,7 @@ async fn update_order_priority(
     #[description = "注文ID"] id: u32,
     #[description = "優先注文にするか"] is_priority: bool,
 ) -> Result<(), anyhow::Error> {
-    if let Some(order) = ctx.data().update_order_priority(id, is_priority).await {
+    if let Some(order) = ctx.data().update_order_priority(id, is_priority).await? {
         ctx.say(format!(
             "注文 `{}` の優先度を `{}` に更新しました。",
             order.id, is_priority
@@ -547,7 +548,7 @@ async fn set_flavor_config(
         cooking_time_minutes,
         quantity_per_batch,
     };
-    ctx.data().set_flavor_config(flavor, config).await;
+    ctx.data().set_flavor_config(flavor, config).await?;
     ctx.say(format!("`{}` の設定を更新しました。", flavor))
         .await?;
     Ok(())

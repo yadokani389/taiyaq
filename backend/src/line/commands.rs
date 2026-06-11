@@ -126,7 +126,9 @@ async fn handle_notification_confirm(
 
     let payload = Notify::Line { user_id };
 
-    if registry.add_notification(order_id, payload).await.is_some() {
+    let result = registry.add_notification(order_id, payload).await;
+
+    if matches!(result, Ok(Some(_))) {
         let buttons_template = create_notification_success_template(order_id);
         send_reply(
             registry,
@@ -134,6 +136,16 @@ async fn handle_notification_confirm(
             vec![create_template_message(
                 Template::ButtonsTemplate(buttons_template),
                 "通知登録完了",
+            )],
+        )
+        .await;
+    } else if let Err(error) = result {
+        eprintln!("Failed to save LINE notification update: {error:?}");
+        send_reply(
+            registry,
+            reply_token,
+            vec![create_text_message(
+                "❌ エラー：通知の登録内容を保存できませんでした。".to_string(),
             )],
         )
         .await;
@@ -171,7 +183,7 @@ async fn handle_notification_cancel(
     let payload = Notify::Line { user_id };
 
     match registry.cancel_notification(order_id, &payload).await {
-        Some(_) => {
+        Ok(Some(_)) => {
             send_reply(
                 registry,
                 reply_token,
@@ -182,7 +194,7 @@ async fn handle_notification_cancel(
             )
             .await;
         }
-        None => {
+        Ok(None) => {
             send_reply(
                 registry,
                 reply_token,
@@ -190,6 +202,17 @@ async fn handle_notification_cancel(
                     "❌ 注文 #{} が見つかりませんでした。",
                     order_id
                 ))],
+            )
+            .await;
+        }
+        Err(error) => {
+            eprintln!("Failed to save LINE notification cancellation: {error:?}");
+            send_reply(
+                registry,
+                reply_token,
+                vec![create_text_message(
+                    "❌ エラー：通知登録のキャンセルを保存できませんでした。".to_string(),
+                )],
             )
             .await;
         }
