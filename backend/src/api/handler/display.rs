@@ -12,6 +12,15 @@ use crate::{
 };
 
 /// GET /api/orders/display
+#[utoipa::path(
+    get,
+    path = "/api/orders/display",
+    tag = "display",
+    responses(
+        (status = 200, description = "Orders grouped for display", body = DisplayOrdersResponse),
+        (status = 500, description = "Failed to load display orders"),
+    )
+)]
 pub async fn get_display_orders(
     State(registry): State<AppRegistry>,
 ) -> Result<Json<DisplayOrdersResponse>, StatusCode> {
@@ -43,6 +52,17 @@ pub async fn get_display_orders(
 }
 
 /// GET /api/orders/{id}
+#[utoipa::path(
+    get,
+    path = "/api/orders/{id}",
+    tag = "display",
+    params(("id" = u32, Path, description = "Order id")),
+    responses(
+        (status = 200, description = "Order details", body = OrderDetailsResponse),
+        (status = 404, description = "Order not found"),
+        (status = 500, description = "Failed to load order details"),
+    )
+)]
 pub async fn get_order_details(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
@@ -58,6 +78,15 @@ pub async fn get_order_details(
 }
 
 /// GET /api/wait-times
+#[utoipa::path(
+    get,
+    path = "/api/wait-times",
+    tag = "display",
+    responses(
+        (status = 200, description = "Current wait times", body = WaitTimeResponse),
+        (status = 500, description = "Failed to load wait times"),
+    )
+)]
 pub async fn get_wait_times(
     State(registry): State<AppRegistry>,
 ) -> Result<Json<WaitTimeResponse>, StatusCode> {

@@ -5,8 +5,11 @@ use chrono::{DateTime, Utc};
 use enum_map::{Enum, EnumMap, enum_map};
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
+use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, Debug, Enum, EnumIter, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(
+    Serialize, Deserialize, ToSchema, Debug, Enum, EnumIter, Clone, PartialEq, Eq, Hash, Copy,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum Flavor {
     Tsubuan,
@@ -43,7 +46,7 @@ impl Flavor {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct FlavorConfig {
     pub cooking_time_minutes: u32,
@@ -94,13 +97,13 @@ pub struct Order {
     pub is_priority: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub flavor: Flavor,
     pub quantity: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq, Copy)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Default, Clone, PartialEq, Eq, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum OrderStatus {
     #[default]
@@ -142,7 +145,7 @@ impl OrderStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Notify {
     Discord { channel_id: u64, user_id: u64 },
     Line { user_id: String },

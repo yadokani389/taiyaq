@@ -15,6 +15,18 @@ use crate::{
     domain::snapshot::{Flavor, FlavorConfig},
 };
 /// GET /api/staff/orders
+#[utoipa::path(
+    get,
+    path = "/api/staff/orders",
+    tag = "staff",
+    params(("status" = Option<String>, Query, description = "Comma-separated order statuses")),
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Staff order list", body = [StaffOrderResponse]),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to load orders"),
+    )
+)]
 pub async fn get_staff_orders(
     State(registry): State<AppRegistry>,
     Query(query): Query<StaffOrdersQuery>,
@@ -42,6 +54,18 @@ pub async fn get_staff_orders(
 }
 
 /// POST /api/staff/orders
+#[utoipa::path(
+    post,
+    path = "/api/staff/orders",
+    tag = "staff",
+    request_body = CreateOrderRequest,
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 201, description = "Created order", body = StaffOrderResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to save order"),
+    )
+)]
 pub async fn create_order(
     State(registry): State<AppRegistry>,
     Json(payload): Json<CreateOrderRequest>,
@@ -58,6 +82,17 @@ pub async fn create_order(
 }
 
 /// GET /api/staff/stock
+#[utoipa::path(
+    get,
+    path = "/api/staff/stock",
+    tag = "staff",
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Unallocated stock by flavor", body = Object),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to load stock"),
+    )
+)]
 pub async fn get_stock(
     State(registry): State<AppRegistry>,
 ) -> Result<Json<EnumMap<Flavor, usize>>, StatusCode> {
@@ -69,6 +104,18 @@ pub async fn get_stock(
 }
 
 /// POST /api/staff/production
+#[utoipa::path(
+    post,
+    path = "/api/staff/production",
+    tag = "staff",
+    request_body = UpdateProductionRequest,
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Production update result", body = UpdateProductionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to save production update"),
+    )
+)]
 pub async fn update_production(
     State(registry): State<AppRegistry>,
     Json(payload): Json<UpdateProductionRequest>,
@@ -87,6 +134,19 @@ pub async fn update_production(
 }
 
 /// POST /api/staff/orders/{id}/complete
+#[utoipa::path(
+    post,
+    path = "/api/staff/orders/{id}/complete",
+    tag = "staff",
+    params(("id" = u32, Path, description = "Order id")),
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Completed order", body = StaffOrderResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Order not found"),
+        (status = 500, description = "Failed to save completed order"),
+    )
+)]
 pub async fn complete_order(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
@@ -102,6 +162,19 @@ pub async fn complete_order(
 }
 
 /// POST /api/staff/orders/{id}/cancel
+#[utoipa::path(
+    post,
+    path = "/api/staff/orders/{id}/cancel",
+    tag = "staff",
+    params(("id" = u32, Path, description = "Order id")),
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Cancelled order", body = StaffOrderResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Order not found"),
+        (status = 500, description = "Failed to save cancelled order"),
+    )
+)]
 pub async fn cancel_order(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
@@ -117,6 +190,20 @@ pub async fn cancel_order(
 }
 
 /// PUT /api/staff/orders/{id}/priority
+#[utoipa::path(
+    put,
+    path = "/api/staff/orders/{id}/priority",
+    tag = "staff",
+    params(("id" = u32, Path, description = "Order id")),
+    request_body = UpdateOrderPriorityRequest,
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Updated order", body = StaffOrderResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Order not found"),
+        (status = 500, description = "Failed to save order priority update"),
+    )
+)]
 pub async fn update_order_priority(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
@@ -141,6 +228,20 @@ pub async fn update_order_priority(
 }
 
 /// PUT /api/orders/{id}/notification
+#[utoipa::path(
+    put,
+    path = "/api/staff/orders/{id}/notification",
+    tag = "staff",
+    params(("id" = u32, Path, description = "Order id")),
+    request_body = NotifyRequest,
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Updated order notification", body = StaffOrderResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Order not found"),
+        (status = 500, description = "Failed to save notification update"),
+    )
+)]
 pub async fn add_notification(
     State(registry): State<AppRegistry>,
     Path(id): Path<u32>,
@@ -160,6 +261,17 @@ pub async fn add_notification(
     }
 }
 /// GET /api/staff/flavors/config
+#[utoipa::path(
+    get,
+    path = "/api/staff/flavors/config",
+    tag = "staff",
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Flavor configs", body = Object),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to load flavor configs"),
+    )
+)]
 pub async fn get_flavor_configs(
     State(registry): State<AppRegistry>,
 ) -> Result<Json<EnumMap<Flavor, FlavorConfig>>, StatusCode> {
@@ -171,6 +283,19 @@ pub async fn get_flavor_configs(
 }
 
 /// PUT /api/staff/flavors/{flavor}
+#[utoipa::path(
+    put,
+    path = "/api/staff/flavors/{flavor}",
+    tag = "staff",
+    params(("flavor" = Flavor, Path, description = "Flavor")),
+    request_body = FlavorConfig,
+    security(("staffBearerAuth" = [])),
+    responses(
+        (status = 200, description = "Flavor config updated"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to save flavor config"),
+    )
+)]
 pub async fn set_flavor_config(
     State(registry): State<AppRegistry>,
     Path(flavor): Path<Flavor>,

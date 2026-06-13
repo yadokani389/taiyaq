@@ -6,6 +6,7 @@ use crate::{
             get_flavor_configs, get_order_details, get_staff_orders, get_stock, get_wait_times,
             line_callback, set_flavor_config, update_order_priority, update_production,
         },
+        openapi::build_openapi,
     },
     app::AppRegistry,
 };
@@ -13,6 +14,7 @@ use axum::{
     Router, middleware,
     routing::{get, post, put},
 };
+use utoipa_swagger_ui::SwaggerUi;
 
 pub fn routes(registry: AppRegistry) -> Router {
     let user_routes = Router::new()
@@ -35,6 +37,7 @@ pub fn routes(registry: AppRegistry) -> Router {
         ));
     let line_router = Router::new().route("/line_callback", post(line_callback));
     Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/openapi.json", build_openapi()))
         .nest("/api", user_routes.merge(staff_routes))
         .merge(line_router)
         .with_state(registry)

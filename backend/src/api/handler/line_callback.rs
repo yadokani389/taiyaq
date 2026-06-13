@@ -4,6 +4,17 @@ use bot_sdk_line::{parser::signature::validate_signature, support::axum::Signatu
 use crate::app::AppRegistry;
 use crate::line::handler;
 
+#[utoipa::path(
+    post,
+    path = "/line_callback",
+    tag = "line",
+    request_body(content = String, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Webhook accepted"),
+        (status = 400, description = "Invalid webhook body"),
+        (status = 401, description = "Invalid LINE signature"),
+    )
+)]
 pub async fn line_callback(
     State(registry): State<AppRegistry>,
     Signature(signature): Signature,

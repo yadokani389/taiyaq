@@ -1,31 +1,32 @@
 use chrono::{DateTime, Utc};
 use enum_map::EnumMap;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::domain::order_number::DisplayOrderNumber;
 use crate::domain::snapshot::{Flavor, Item, Notify, Order, OrderStatus};
 
 //==// Request Bodies //==//
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateOrderRequest {
     pub items: Vec<Item>,
     pub is_priority: Option<bool>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateProductionRequest {
     pub items: Vec<Item>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateOrderPriorityRequest {
     pub is_priority: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub enum NotifyRequest {
     Discord { channel_id: u64, user_id: u64 },
     Line { user_id: String },
@@ -69,7 +70,7 @@ where
 
 //==// Response Bodies //==//
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayOrdersResponse {
     pub ready: Vec<DisplayOrder>,
@@ -77,7 +78,7 @@ pub struct DisplayOrdersResponse {
     pub waiting: Vec<DisplayOrder>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayOrder {
     pub id: u32,
@@ -93,7 +94,7 @@ impl DisplayOrder {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderDetailsResponse {
     pub id: u32,
@@ -104,20 +105,21 @@ pub struct OrderDetailsResponse {
     pub estimated_wait_minutes: Option<i64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WaitTimeResponse {
+    #[schema(value_type = Object)]
     pub wait_times: EnumMap<Flavor, Option<i64>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProductionResponse {
     pub newly_ready_orders: Vec<u32>,
     pub unallocated_items: Vec<Item>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StaffOrderResponse {
     pub id: u32,

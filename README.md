@@ -31,3 +31,13 @@
 - **APIサーバー:** ユーザー、スタッフ、Botからのリクエストを処理するRESTful APIを提供します。
 - **通知サービス:** 注文のステータスが更新された際に、LINEやDiscordへ通知を送信する機能。
 - **Discord Bot連携:** Discord Botを通じて、ユーザーからの注文状況確認や通知設定を受け付けます。
+
+## ドキュメント
+
+- API仕様: `docs/openapi.md`
+- API設計メモ: `docs/api_design.md`
+- API手動テスト用curl: `docs/api_test_commands.md`
+- SQLite / sqlx運用: `docs/sqlite.md`
+
+バックエンド起動中は、Swagger UIを `http://127.0.0.1:38000/swagger-ui/` で確認できます。
+OpenAPI JSONは `http://127.0.0.1:38000/openapi.json` です。

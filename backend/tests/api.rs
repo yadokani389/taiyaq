@@ -1,11 +1,45 @@
 #[path = "api/helper.rs"]
 mod helper;
 
-use axum::{body::Body, http::Request};
+use axum::{
+    body::{self, Body},
+    http::Request,
+};
 use taiyaq_backend::domain::snapshot::{Flavor, Item, OrderStatus};
 use tower::ServiceExt;
 
 use crate::helper::{TestRequestExt, deserialize_json, make_router, registry_with_snapshot};
+
+#[tokio::test]
+async fn get_openapi_json_200_includes_paths() -> anyhow::Result<()> {
+    let app = make_router(registry_with_snapshot(|_| {}));
+
+    let response = app
+        .oneshot(Request::get("/openapi.json").body(Body::empty())?)
+        .await?;
+
+    assert_eq!(response.status(), axum::http::StatusCode::OK);
+    let body = deserialize_json(response).await?;
+    assert_eq!(body["openapi"], "3.1.0");
+    assert!(body["paths"]["/api/orders/display"].is_object());
+    assert!(body["paths"]["/api/staff/orders"].is_object());
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_swagger_ui_200_returns_html() -> anyhow::Result<()> {
+    let app = make_router(registry_with_snapshot(|_| {}));
+
+    let response = app
+        .oneshot(Request::get("/swagger-ui/").body(Body::empty())?)
+        .await?;
+
+    assert_eq!(response.status(), axum::http::StatusCode::OK);
+    let bytes = body::to_bytes(response.into_body(), usize::MAX).await?;
+    let body = std::str::from_utf8(&bytes)?;
+    assert!(body.contains("Swagger UI"));
+    Ok(())
+}
 
 #[tokio::test]
 async fn get_display_orders_200_groups_orders_by_status() -> anyhow::Result<()> {

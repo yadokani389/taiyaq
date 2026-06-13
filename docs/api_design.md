@@ -1,281 +1,61 @@
-# API設計
-
-たい焼き管理システム `taiyaq` のAPI設計です。
-
-## 1. データモデル
-
-### Order (注文)
-
-```json
-{
-    "id": "integer",            // 注文番号 (予約番号)
-    "items": [
-        {
-            "flavor": "'tsubuan' | 'custard' | 'kurikinton'", // 味 (Enumとして管理)
-            "quantity": "integer" // 個数
-        }
-    ],
-    "status": "string",         // 'waiting' | 'cooking' | 'ready' | 'completed' | 'cancelled'
-    "orderedAt": "string",      // 注文日時 (ISO 8601)
-    "readyAt": "string | null",   // 準備完了日時 (ISO 8601)
-    "completedAt": "string | null",// 受け渡し完了日時 (ISO 8601)
-    "is_priority": "boolean",   // 優先注文フラグ (割り込み予約など)
-    "notify": [
-        {
-            "channel": "discord" | "line",
-            "target": "string" // DiscordのID、またはLINEユーザーID
-        }
-    ] // 通知設定 (配列)
-}
-```
-
-## 2. APIエンドポイント
-
-### 【ユーザー・店頭ディスプレイ向けAPI】
-
-#### `GET /api/orders/display`
-
-店頭ディスプレイやユーザー向けWebページで、呼び出し中・調理中の番号を表示するためのAPIです。
-
-- **レスポンス:**
-
-  ```json
-  {
-    "ready": [
-      // 受け取り可能
-      { "id": 101 },
-      { "id": 102 }
-    ],
-    "cooking": [
-      // 現在調理中
-      { "id": 103 },
-      { "id": 104 }
-    ],
-    "waiting": [
-      // 待機中
-      { "id": 105 },
-      { "id": 106 }
-    ]
-  }
-  ```
-
-#### `GET /api/orders/{id}`
-
-ユーザーが自分の予約番号で、現在の状況と推定待ち時間を確認するためのAPIです。
-
-- **パスパラメータ:**
-  - `id`: 注文番号 (integer)
-- **レスポンス:**
-
-  ```json
-  {
-    "id": 105,
-    "items": [
-      { "flavor": "tsubuan", "quantity": 2 },
-      { "flavor": "custard", "quantity": 1 }
-    ],
-    "status": "waiting", // 現在のステータス
-    "orderedAt": "2025-10-30T13:16:25.169400804Z",
-    "estimatedWaitMinutes": 15 // 受け取り可能になるまでの推定時間(分)。ready, completedの場合はnull
-  }
-  ```
-
-  _推定時間の計算は、前の注文数や厨房の生産能力からバックエンドで計算することを想定しています。_
-
-#### `GET /api/wait-times`
-
-現在のフレーバーごとの待ち時間を取得するためのAPIです。ユーザーが注文前に待ち時間を確認するのに使用します。
-
-- **レスポンス:**
-
-  ```json
-  {
-    "waitTimes": {
-      "tsubuan": 15,
-      "custard": 30,
-      "kurikinton": null
-    }
-  }
-  ```
-
-  _`estimatedWaitMinutes`が`null`の場合は、そのフレーバーが現在提供不可（例：バッチサイズが0）であることを示します。_
+# API設計メモ
 
-### 【スタッフ向けAPI】
+このドキュメントは、たい焼き管理システム `taiyaq` のAPI設計意図を残すためのメモです。
+最新のAPI仕様、リクエスト、レスポンス、ステータスコードは、実装から生成されるOpenAPIを正とします。
 
-**認証:**
+- Swagger UI: `/swagger-ui/`
+- OpenAPI JSON: `/openapi.json`
+- OpenAPIの運用方法: `docs/openapi.md`
 
-すべてのスタッフ向けAPIエンドポイントは、`Authorization: Bearer <TOKEN>` ヘッダーによる認証を必要とします。
-`<TOKEN>` はサーバーで設定されたAPIトークンです。
-正しいトークンが提供されない場合、APIは `401 Unauthorized` を返します。
+## APIの利用者
 
-#### `GET /api/staff/flavors/config`
+APIは主に次の利用者に分かれます。
 
-各味の調理時間と一度に焼ける数（バッチサイズ）の設定を全て取得します。
+- ユーザー・店頭ディスプレイ向け: 注文状況、受け取り可能番号、待ち時間を確認する
+- スタッフ向け: 注文作成、焼き上がり登録、受け渡し完了、キャンセル、味ごとの設定を操作する
+- Bot / Webhook向け: LINEやDiscordから通知登録、注文状況確認、通知送信を行う
 
-- **レスポンス:**
+## 認証方針
 
-  ```json
-  {
-    "tsubuan": {
-      "cookingTimeMinutes": 15,
-      "quantityPerBatch": 9
-    },
-    "custard": {
-      "cookingTimeMinutes": 15,
-      "quantityPerBatch": 9
-    },
-    "kurikinton": {
-      "cookingTimeMinutes": 15,
-      "quantityPerBatch": 2
-    }
-  }
-  ```
+ユーザー・店頭ディスプレイ向けAPIは、店頭表示や注文番号による確認を想定して認証なしで公開します。
 
-#### `PUT /api/staff/flavors/{flavor}`
+スタッフ向けAPIは、`Authorization: Bearer <STAFF_API_TOKEN>` による認証を必須にします。
+トークンはサーバー側の環境変数 `STAFF_API_TOKEN` で設定します。
 
-各味の調理時間と一度に焼ける数（バッチサイズ）を設定します。
+LINE webhookはLINE署名を検証します。
 
-- **パスパラメータ:**
-  - `flavor`: `tsubuan` | `custard` | `kurikinton`
-- **リクエストボディ:**
+## 注文状態
 
-  ```json
-  {
-    "cookingTimeMinutes": 10,
-    "quantityPerBatch": 8
-  }
-  ```
+注文状態は、注文受付から受け渡し完了までの業務フローを表します。
 
-- **レスポンス:** `200 OK` と更新された設定オブジェクト
+- `waiting`: 在庫割り当て待ち
+- `cooking`: 調理中
+- `ready`: 受け取り可能
+- `completed`: 受け渡し完了
+- `cancelled`: キャンセル済み
 
-#### `GET /api/staff/orders`
+状態遷移や優先注文の扱いは、API handlerではなくusecase/domain層で決定します。
+APIは現在の状態を返し、スタッフ操作をusecaseに渡す境界として扱います。
 
-スタッフが管理画面で現在の注文一覧を確認するためのAPIです。
+## 待ち時間
 
-- **クエリパラメータ (任意):**
-  - `status`: `waiting` や `cooking` など、ステータスで絞り込み可能 (例: `?status=waiting,cooking`)
-- **レスポンス:** `[Order]` (Orderオブジェクトの配列)
+待ち時間は、現在の在庫、注文順、味ごとの調理時間、バッチサイズからバックエンドで計算します。
+frontendは計算結果を表示するだけにし、待ち時間ロジックを重複実装しません。
 
-#### `GET /api/staff/stock`
+## 通知
 
-現在の未割り当ての在庫数を取得します。
+通知先は注文に紐付けます。
+注文が `ready` になったタイミングで、登録済みの通知先へLINEまたはDiscordで通知します。
 
-- **レスポンス:**
+通知送信の成否はログとして保存し、注文状態そのものとは分離します。
+通知失敗によって注文状態を巻き戻さない方針です。
 
-  ```json
-  {
-    "tsubuan": 10,
-    "custard": 5,
-    "kurikinton": 0
-  }
-  ```
+## OpenAPI管理
 
-#### `POST /api/staff/orders`
+OpenAPI定義は `utoipa` でRustコードから生成します。
+手書きのendpoint一覧やJSON schemaはこのドキュメントでは管理しません。
 
-新しい注文を作成します。
+APIを変更した場合は、handlerの `#[utoipa::path]` と `ToSchema` 対象の型を更新します。
+現在は `backend/src/api/openapi.rs` の `build_openapi()` で単一のOpenAPI定義を生成します。
 
-- **リクエストボディ:**
-
-  ```json
-  {
-    "items": [
-      { "flavor": "tsubuan", "quantity": 5 },
-      { "flavor": "custard", "quantity": 10 }
-    ],
-    "is_priority": false // (任意) 優先注文にする場合はtrue
-  }
-  ```
-
-- **レスポンス:** `201 Created` と作成された `Order` オブジェクト
-
-#### `POST /api/staff/production`
-
-スタッフが焼き上がったたい焼きの数を報告します。バックエンドはこの情報をもとに、待ち状態の注文を自動で「準備完了(ready)」状態に更新します。
-
-- **リクエストボディ:**
-
-  ```json
-  {
-    "items": [
-      { "flavor": "tsubuan", "quantity": 20 },
-      { "flavor": "custard", "quantity": 20 }
-    ]
-  }
-  ```
-
-- **レスポンス:**
-
-  ```json
-  {
-    // この報告によって新たに「準備完了」になった注文番号のリスト
-    "newlyReadyOrders": [101, 102],
-    // どの注文にも割り当てられなかった在庫
-    "unallocatedItems": [{ "flavor": "tsubuan", "quantity": 5 }]
-  }
-  ```
-
-#### `POST /api/staff/orders/{id}/complete`
-
-お客様が商品を受け取った際に、注文を「受け渡し完了(completed)」にするためのAPIです。
-
-- **パスパラメータ:**
-  - `id`: 注文番号 (integer)
-- **リクエストボディ:** (なし)
-- **レスポンス:** 更新された `Order` オブジェクト
-
-#### `POST /api/staff/orders/{id}/cancel`
-
-注文をキャンセルするためのAPIです。
-
-- **パスパラメータ:**
-  - `id`: 注文番号 (integer)
-- **リクエストボディ:** (なし)
-- **レスポンス:** 更新された `Order` オブジェクト (statusが `cancelled` になる)
-
-#### `PUT /api/staff/orders/{id}/priority`
-
-既存の注文の優先度を更新します。
-
-- **パスパラメータ:**
-  - `id`: 注文番号 (integer)
-- **リクエストボディ:**
-
-  ```json
-  {
-    "is_priority": true
-  }
-  ```
-
-- **レスポンス:** `200 OK` と更新された `Order` オブジェクト
-
-#### `PUT /api/staff/orders/{id}/notification`
-
-注文に通知先を登録します。
-
-- **パスパラメータ:**
-  - `id`: 注文番号 (integer)
-- **リクエストボディ:**
-
-  ```json
-  {
-      "channel": "discord" | "line",
-      "target": "string" // DiscordのID、またはLINEユーザーID
-  }
-  ```
-
-- **レスポンス:** `200 OK` と更新された `Order` オブジェクト
-
-### 【LINE Bot向けWebhook】
-
-#### `POST /line_callback`
-
-LINE Messaging APIからのWebhookを受け取るエンドポイントです。
-
-- **リクエストボディ:** LINE Messaging APIのWebhookイベントオブジェクト
-- **機能:**
-  - ユーザーからのメッセージを解析し、注文番号や通知設定用のメールアドレス/LINEユーザーIDを抽出します。
-  - 抽出した情報に基づき、以下の処理を行います。
-    - **通知設定**: ユーザーから提供されたメールアドレスまたはLINEユーザーIDを`PUT /api/orders/{id}/notification`エンドポイントを通じて注文に紐付け、通知先として設定します。
-    - **注文ステータス照会**: ユーザーが問い合わせた注文番号の現在のステータスと推定待ち時間を`GET /api/orders/{id}`エンドポイントから取得し、LINEで返信します。
-    - **その他**: 未知のコマンドや問い合わせに対しては、適切なヘルプメッセージを返信します。
-- **レスポンス:** `200 OK`
+APIグループが増えて `openapi.rs` が見通しづらくなった場合は、handlerごとに `ApiDoc` を定義し、`build_openapi()` でmergeする構成へ移行します。
