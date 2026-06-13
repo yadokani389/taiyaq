@@ -2,10 +2,10 @@
 import { computed, onMounted, onUnmounted, ref, triggerRef } from 'vue'
 import { fetchApiOrdersDisplay, fetchApiOrdersId } from '../scripts/api'
 import { computedAsync } from '@vueuse/core'
-import type { OrdersDisplayResponse } from '../types'
+import type { DisplayOrdersResponse } from '../../../src/types/api'
 import { ProgressSpinner, Select } from 'primevue'
 
-const orders = ref<OrdersDisplayResponse>()
+const orders = ref<DisplayOrdersResponse>()
 const flattenedOrders = computed(() => {
   if (!orders.value) return []
   return [

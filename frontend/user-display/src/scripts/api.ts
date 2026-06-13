@@ -1,48 +1,34 @@
-import type { OrdersDisplayResponse, OrdersIdResponse, WaitTimesResponse } from '@/types'
+import { openApiClient } from '../../../src/services/api'
+import type {
+  DisplayOrdersResponse,
+  OrderDetailsResponse,
+  WaitTimeResponse,
+} from '../../../src/types/api'
 
-const getBaseURL = () => {
-  const baseURL = import.meta.env.VITE_API_BASE_URL
-  if (!baseURL) {
-    throw new Error('VITE_API_BASE_URL is not defined in environment variables')
+export const fetchApiOrdersDisplay = async (): Promise<DisplayOrdersResponse> => {
+  const { data, error, response } = await openApiClient.GET('/api/orders/display')
+  if (!data) {
+    throw new Error(`Error fetching orders: ${response.statusText || JSON.stringify(error)}`)
   }
-  return baseURL.replace(/\/+$/, '')
+  return data
 }
 
-export const fetchApiOrdersDisplay = async (): Promise<OrdersDisplayResponse> => {
-  const response = await fetch(`${getBaseURL()}/api/orders/display`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+export const fetchApiOrdersId = async (orderId: number): Promise<OrderDetailsResponse> => {
+  const { data, error, response } = await openApiClient.GET('/api/orders/{id}', {
+    params: { path: { id: orderId } },
   })
-  if (!response.ok) {
-    throw new Error(`Error fetching orders: ${response.statusText}`)
+  if (!data) {
+    throw new Error(
+      `Error fetching order ${orderId}: ${response.statusText || JSON.stringify(error)}`,
+    )
   }
-  return await response.json()
+  return data
 }
 
-export const fetchApiOrdersId = async (orderId: number): Promise<OrdersIdResponse> => {
-  const response = await fetch(`${getBaseURL()}/api/orders/${orderId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-  if (!response.ok) {
-    throw new Error(`Error fetching order ${orderId}: ${response.statusText}`)
+export const fetchApiWaitTimes = async (): Promise<WaitTimeResponse> => {
+  const { data, error, response } = await openApiClient.GET('/api/wait-times')
+  if (!data) {
+    throw new Error(`Error fetching wait times: ${response.statusText || JSON.stringify(error)}`)
   }
-  return await response.json()
-}
-
-export const fetchApiWaitTimes = async (): Promise<WaitTimesResponse> => {
-  const response = await fetch(`${getBaseURL()}/api/wait-times`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-  if (!response.ok) {
-    throw new Error(`Error fetching wait times: ${response.statusText}`)
-  }
-  return await response.json()
+  return data
 }

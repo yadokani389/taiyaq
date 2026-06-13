@@ -1,14 +1,10 @@
 <script lang="ts" setup>
 import { fetchApiWaitTimes } from '@/scripts/api'
-import type { WaitTimesResponse } from '@/types'
+import type { WaitTimeResponse } from '../../../src/types/api'
 import { ProgressSpinner } from 'primevue'
 import { onMounted, onUnmounted, ref } from 'vue'
 
-const waitTimes = ref<{
-  tsubuan: number | null
-  custard: number | null
-  kurikinton: number | null
-}>()
+const waitTimes = ref<WaitTimeResponse['waitTimes']>()
 
 const intervalId = ref<number>()
 onMounted(async () => {
@@ -30,21 +26,21 @@ onUnmounted(() => {
       <div v-if="waitTimes" :class="$style.waitTimesContainer">
         <div :class="[$style.waitTimeCard, $style.tsubuan]">
           <strong>つぶあん</strong>
-          <span v-if="waitTimes.tsubuan !== null"
+          <span v-if="waitTimes.tsubuan != null"
             >{{ waitTimes.tsubuan }} <span :class="$style.min">分</span></span
           >
           <span v-else>現在提供不可</span>
         </div>
         <div :class="[$style.waitTimeCard, $style.custard]">
           <strong>カスタード</strong>
-          <span v-if="waitTimes.custard !== null"
+          <span v-if="waitTimes.custard != null"
             >{{ waitTimes.custard }} <span :class="$style.min">分</span></span
           >
           <span v-else>現在提供不可</span>
         </div>
         <div :class="[$style.waitTimeCard, $style.kurikinton]">
           <strong>栗きんとん</strong>
-          <span v-if="waitTimes.kurikinton !== null"
+          <span v-if="waitTimes.kurikinton != null"
             >{{ waitTimes.kurikinton }} <span :class="$style.min">分</span></span
           >
           <span v-else>現在提供不可</span>

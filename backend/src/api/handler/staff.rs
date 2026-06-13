@@ -3,13 +3,13 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
 };
-use enum_map::EnumMap;
 use tracing::{error, info};
 
 use crate::{
     api::model::{
-        CreateOrderRequest, NotifyRequest, StaffOrderResponse, StaffOrdersQuery,
-        UpdateOrderPriorityRequest, UpdateProductionRequest, UpdateProductionResponse,
+        CreateOrderRequest, FlavorConfigsResponse, NotifyRequest, StaffOrderResponse,
+        StaffOrdersQuery, StockResponse, UpdateOrderPriorityRequest, UpdateProductionRequest,
+        UpdateProductionResponse,
     },
     app::AppRegistry,
     domain::snapshot::{Flavor, FlavorConfig},
@@ -88,19 +88,19 @@ pub async fn create_order(
     tag = "staff",
     security(("staffBearerAuth" = [])),
     responses(
-        (status = 200, description = "Unallocated stock by flavor", body = Object),
+        (status = 200, description = "Unallocated stock by flavor", body = StockResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Failed to load stock"),
     )
 )]
 pub async fn get_stock(
     State(registry): State<AppRegistry>,
-) -> Result<Json<EnumMap<Flavor, usize>>, StatusCode> {
+) -> Result<Json<StockResponse>, StatusCode> {
     let snapshot = registry.snapshot().await.map_err(|error| {
         error!(?error, "failed to load stock");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    Ok(Json(snapshot.unallocated_stock))
+    Ok(Json(snapshot.unallocated_stock.into()))
 }
 
 /// POST /api/staff/production
@@ -267,19 +267,19 @@ pub async fn add_notification(
     tag = "staff",
     security(("staffBearerAuth" = [])),
     responses(
-        (status = 200, description = "Flavor configs", body = Object),
+        (status = 200, description = "Flavor configs", body = FlavorConfigsResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Failed to load flavor configs"),
     )
 )]
 pub async fn get_flavor_configs(
     State(registry): State<AppRegistry>,
-) -> Result<Json<EnumMap<Flavor, FlavorConfig>>, StatusCode> {
+) -> Result<Json<FlavorConfigsResponse>, StatusCode> {
     let snapshot = registry.snapshot().await.map_err(|error| {
         error!(?error, "failed to load flavor configs");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    Ok(Json(snapshot.flavor_configs))
+    Ok(Json(snapshot.flavor_configs.into()))
 }
 
 /// PUT /api/staff/flavors/{flavor}

@@ -1,11 +1,11 @@
 import { apiClient } from '../client'
-import type { ProductionReportRequest, ProductionReportResponse, ApiResponse } from '../types'
+import type { UpdateProductionRequest, UpdateProductionResponse, ApiResponse } from '../types'
 
 export class ProductionApi {
   async reportProduction(
-    report: ProductionReportRequest,
-  ): Promise<ApiResponse<ProductionReportResponse>> {
-    return apiClient.post<ProductionReportResponse>('/api/staff/production', report)
+    report: UpdateProductionRequest,
+  ): Promise<ApiResponse<UpdateProductionResponse>> {
+    return apiClient.post<UpdateProductionResponse>('/api/staff/production', report)
   }
 }
 

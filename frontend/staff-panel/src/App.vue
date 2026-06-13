@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ordersApi, productionApi, flavorsApi, stockApi, apiClient } from './api'
-import type { Order, Flavor } from './api/types'
+import type { StaffOrderResponse, Flavor } from './api/types'
 
 const currentView = ref<'order' | 'baking' | 'settings'>('order')
-const orders = ref<Order[]>([])
+const orders = ref<StaffOrderResponse[]>([])
 const stockData = ref<{ つぶあん: number; カスタード: number; 栗きんとん: number }>({
   つぶあん: 0,
   カスタード: 0,

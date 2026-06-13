@@ -27,7 +27,7 @@ tower-http = { version = "0.6.6", features = ["cors"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono"] }
-utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }
 
 [dev-dependencies]
 tower = { version = "0.5.2", features = ["util"] }
@@ -39,3 +39,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "taiyaq-backend"
 path = "src/main.rs"
+
+[[bin]]
+name = "generate-openapi"
+path = "src/bin/generate_openapi.rs"

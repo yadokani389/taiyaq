@@ -326,7 +326,7 @@ impl AppRegistry {
     pub async fn get_current_wait_times(&self) -> anyhow::Result<WaitTimeResponse> {
         let snapshot = self.repository.load_snapshot().await?;
         Ok(WaitTimeResponse {
-            wait_times: wait_time::estimate_current_wait_times(&snapshot),
+            wait_times: wait_time::estimate_current_wait_times(&snapshot).into(),
         })
     }
 

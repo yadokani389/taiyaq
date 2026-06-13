@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::domain::order_number::DisplayOrderNumber;
-use crate::domain::snapshot::{Flavor, Item, Notify, Order, OrderStatus};
+use crate::domain::snapshot::{Flavor, FlavorConfig, Item, Notify, Order, OrderStatus};
 
 //==// Request Bodies //==//
 
@@ -108,8 +108,72 @@ pub struct OrderDetailsResponse {
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WaitTimeResponse {
-    #[schema(value_type = Object)]
-    pub wait_times: EnumMap<Flavor, Option<i64>>,
+    pub wait_times: WaitTimes,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WaitTimes {
+    pub tsubuan: Option<i64>,
+    pub custard: Option<i64>,
+    pub kurikinton: Option<i64>,
+}
+
+impl From<EnumMap<Flavor, Option<i64>>> for WaitTimes {
+    fn from(wait_times: EnumMap<Flavor, Option<i64>>) -> Self {
+        Self {
+            tsubuan: wait_times[Flavor::Tsubuan],
+            custard: wait_times[Flavor::Custard],
+            kurikinton: wait_times[Flavor::Kurikinton],
+        }
+    }
+}
+
+impl WaitTimes {
+    pub fn iter(&self) -> impl Iterator<Item = (Flavor, Option<i64>)> {
+        [
+            (Flavor::Tsubuan, self.tsubuan),
+            (Flavor::Custard, self.custard),
+            (Flavor::Kurikinton, self.kurikinton),
+        ]
+        .into_iter()
+    }
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StockResponse {
+    pub tsubuan: usize,
+    pub custard: usize,
+    pub kurikinton: usize,
+}
+
+impl From<EnumMap<Flavor, usize>> for StockResponse {
+    fn from(stock: EnumMap<Flavor, usize>) -> Self {
+        Self {
+            tsubuan: stock[Flavor::Tsubuan],
+            custard: stock[Flavor::Custard],
+            kurikinton: stock[Flavor::Kurikinton],
+        }
+    }
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FlavorConfigsResponse {
+    pub tsubuan: FlavorConfig,
+    pub custard: FlavorConfig,
+    pub kurikinton: FlavorConfig,
+}
+
+impl From<EnumMap<Flavor, FlavorConfig>> for FlavorConfigsResponse {
+    fn from(configs: EnumMap<Flavor, FlavorConfig>) -> Self {
+        Self {
+            tsubuan: configs[Flavor::Tsubuan],
+            custard: configs[Flavor::Custard],
+            kurikinton: configs[Flavor::Kurikinton],
+        }
+    }
 }
 
 #[derive(Serialize, ToSchema)]

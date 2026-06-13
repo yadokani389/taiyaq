@@ -362,7 +362,7 @@ fn format_order_details(details: &crate::api::model::OrderDetailsResponse) -> St
 fn format_wait_times(wait_times: &crate::api::model::WaitTimeResponse) -> String {
     let mut lines = vec!["⏱️ 現在の待ち時間".to_string(), "".to_string()];
 
-    for (flavor, time) in &wait_times.wait_times {
+    for (flavor, time) in wait_times.wait_times.iter() {
         let time_str = time.map_or("提供なし".to_string(), |t| {
             if t == 0 {
                 "すぐに提供できます".to_string()

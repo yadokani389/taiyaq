@@ -1,6 +1,6 @@
 import { apiClient } from '../client'
-import type { StockData } from '../types'
+import type { StockResponse } from '../types'
 
 export const stockApi = {
-  getStock: () => apiClient.get<StockData>('/api/staff/stock'),
+  getStock: () => apiClient.get<StockResponse>('/api/staff/stock'),
 }

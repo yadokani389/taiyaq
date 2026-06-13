@@ -214,7 +214,7 @@ pub async fn waittime(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
     let wait_times = ctx.data().get_current_wait_times().await?;
     let mut fields = Vec::new();
 
-    for (flavor, time) in wait_times.wait_times {
+    for (flavor, time) in wait_times.wait_times.iter() {
         let time_str = time.map_or("提供なし".into(), |t| {
             if t == 0 {
                 "すぐに提供できます".into()

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { client } from './services/api'
-import type { DisplayResponse } from './types/api'
+import type { DisplayOrdersResponse } from '../../src/types/api'
 
-const displayData = ref<DisplayResponse>({ ready: [], cooking: [], waiting: [] })
+const displayData = ref<DisplayOrdersResponse>({ ready: [], cooking: [], waiting: [] })
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
@@ -23,7 +23,7 @@ function fetchData() {
   error.value = null
   client
     .fetchDisplayOrders()
-    .then((data: DisplayResponse) => {
+    .then((data: DisplayOrdersResponse) => {
       displayData.value = data
       nextTick(() => {
         checkOverflow()

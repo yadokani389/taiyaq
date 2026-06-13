@@ -1,20 +1,14 @@
-import type { DisplayResponse } from '../types/api'
+import { openApiClient } from '../../../src/services/api'
+import type { DisplayOrdersResponse } from '../../../src/types/api'
 
-const getBaseURL = () => {
-  const baseURL = import.meta.env.VITE_API_BASE_URL
-  if (!baseURL) {
-    throw new Error('VITE_API_BASE_URL is not defined in environment variables')
+export async function fetchDisplayOrders(): Promise<DisplayOrdersResponse> {
+  const { data, error, response } = await openApiClient.GET('/api/orders/display')
+  if (!data) {
+    throw new Error(
+      `Failed to fetch display orders: ${response.statusText || JSON.stringify(error)}`,
+    )
   }
-  return baseURL.replace(/\/+$/, '')
-}
-
-export async function fetchDisplayOrders(): Promise<DisplayResponse> {
-  const base = getBaseURL()
-  const response = await fetch(`${base}/api/orders/display`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch display orders: ${response.statusText}`)
-  }
-  return response.json() as Promise<DisplayResponse>
+  return data
 }
 
 export const client = {

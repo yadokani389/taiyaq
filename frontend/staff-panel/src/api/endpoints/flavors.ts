@@ -1,9 +1,9 @@
 import { apiClient } from '../client'
-import type { Flavor, FlavorConfig, ApiResponse } from '../types'
+import type { Flavor, FlavorConfig, FlavorConfigsResponse, ApiResponse } from '../types'
 
 export class FlavorsApi {
-  async getFlavorConfigs(): Promise<ApiResponse<Record<Flavor, FlavorConfig>>> {
-    return apiClient.get<Record<Flavor, FlavorConfig>>('/api/staff/flavors/config')
+  async getFlavorConfigs(): Promise<ApiResponse<FlavorConfigsResponse>> {
+    return apiClient.get<FlavorConfigsResponse>('/api/staff/flavors/config')
   }
 
   async updateFlavorConfig(
