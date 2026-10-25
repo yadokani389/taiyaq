@@ -1,0 +1,38 @@
+{
+  "name": "taiyaq",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm db:migrate:local && vp dev",
+    "build": "vp build",
+    "test": "vp test run",
+    "check": "vp check && vp test run && vp build",
+    "typecheck": "vp check --no-fmt --no-lint",
+    "db:migrate:local": "node scripts/migrate.ts --local",
+    "db:migrate:remote": "node scripts/migrate.ts",
+    "deploy": "pnpm check && cf deploy --prebuilt --mode production"
+  },
+  "dependencies": {
+    "hono": "^4.12.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "valibot": "^1.5.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.4",
+    "@cloudflare/workers-types": "^5.20261025.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "cf": "1.0.0-beta.21",
+    "esbuild": "^0.27.0",
+    "miniflare": "^4.20260730.0",
+    "oxc-transform-react": "^0.152.0",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  }
+}

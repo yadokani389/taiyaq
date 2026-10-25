@@ -1,0 +1,83 @@
+export const FLAVORS = [
+  { id: "tsubuan", name: "粒あん" },
+  { id: "custard", name: "カスタード" },
+  { id: "kurikinton", name: "栗きんとん" },
+  { id: "imoan", name: "いもあん" },
+  { id: "ujimatcha", name: "宇治抹茶あん" },
+] as const;
+
+export type FlavorId = (typeof FLAVORS)[number]["id"];
+export type Counts = Record<FlavorId, number>;
+export type OrderStatus = "waiting" | "ready" | "completed" | "cancelled";
+export type Flavor = {
+  id: FlavorId;
+  enabled: boolean;
+  cookingMinutes: number;
+  perBatch: number;
+};
+export type Day = {
+  id: string;
+  lastNumber: number;
+  nextSequence: number;
+  closedAt: string | null;
+};
+export type Order = {
+  id: string;
+  day: string;
+  sequence: number;
+  number: number;
+  status: OrderStatus;
+  items: Counts;
+  allocated: Counts;
+  createdAt: string;
+  finishedAt: string | null;
+};
+export type State = {
+  revision: number;
+  day: Day | null;
+  flavors: Flavor[];
+  stock: Counts;
+  orders: Order[];
+};
+export type Command =
+  | { type: "start"; day: string }
+  | { type: "close"; day: string }
+  | { type: "order"; day: string; items: Counts }
+  | { type: "production"; day: string; items: Counts }
+  | { type: "adjust"; day: string; items: Counts }
+  | { type: "complete" | "cancel"; day: string; orderId: string }
+  | { type: "flavor"; flavor: Flavor };
+export type CommandRequest = { operationId: string; command: Command };
+export type CommandResult = { order?: Order; day?: string };
+export type PublicOrder = Pick<
+  Order,
+  "id" | "day" | "number" | "status" | "items"
+>;
+export type PublicState = {
+  day: string | null;
+  flavors: Array<
+    Pick<Flavor, "id" | "enabled"> & { waitMinutes: number | null }
+  >;
+  orders: Array<Pick<Order, "id" | "number" | "status">>;
+};
+
+export function zeroCounts(): Counts {
+  return Object.fromEntries(FLAVORS.map(({ id }) => [id, 0])) as Counts;
+}
+
+export function total(counts: Counts): number {
+  return FLAVORS.reduce((sum, { id }) => sum + counts[id], 0);
+}
+
+export function japanDate(now = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(
+    now,
+  );
+}
+
+export const STATUS_LABELS: Record<OrderStatus, string> = {
+  waiting: "準備中",
+  ready: "受け取り可能",
+  completed: "受け渡し済み",
+  cancelled: "キャンセル済み",
+};
