@@ -21,10 +21,10 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press("1");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("1");
-  await page.keyboard.press("Control+Enter");
+  await page.keyboard.press("Enter");
   await expect(page.locator(".notice")).toContainText("1番で受け付けました");
   await page.keyboard.press("1");
-  await page.keyboard.press("Control+Enter");
+  await page.keyboard.press("NumpadEnter");
   await expect(page.locator(".notice")).toContainText("2番で受け付けました");
   await page.getByRole("button", { name: /販売設定/ }).click();
   await page
@@ -59,7 +59,8 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     await route.fetch();
     await route.abort("failed");
   });
-  await page.getByRole("button", { name: /焼き上がりを登録/ }).click();
+  await page.keyboard.press("1");
+  await page.keyboard.press("Enter");
   await expect(page.getByRole("alert")).toContainText(
     "送信結果を確認できません",
   );
@@ -109,12 +110,39 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await display.screenshot({ path: "/tmp/taiyaq-display.png", fullPage: true });
   await page.bringToFront();
   await page.keyboard.press("/");
+  const search = page.getByRole("textbox", { name: "整理券番号で検索" });
+  const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
+  await page.keyboard.type("1");
+  await expect(receive).toBeDisabled();
+  await page.keyboard.press("Enter");
+  await expect(search).toHaveValue("1");
+  await page.keyboard.press("Escape");
+  await expect(search).not.toBeFocused();
+  await page.keyboard.press("/");
   await page.keyboard.type("3");
+  await expect(receive).toBeEnabled();
+  await page.screenshot({ path: "/tmp/taiyaq-receiving.png", fullPage: true });
+  page.once("dialog", (dialog) => {
+    void dialog.dismiss();
+  });
+  await page.keyboard.press("Enter");
+  await expect(search).toHaveValue("3");
+  await page.keyboard.press("Tab");
+  await expect(receive).toBeFocused();
   page.once("dialog", (dialog) => {
     void dialog.accept();
   });
   await page.keyboard.press("Enter");
   await expect(page.locator(".order-row.ready")).toHaveCount(0);
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("");
+  await expect(page.locator(".order-row")).toHaveCount(2);
+  await page.keyboard.type("1");
+  await expect(search).toHaveValue("1");
+  await expect(page.getByLabel("粒あんの数量", { exact: true })).toHaveText(
+    "0",
+  );
+  await page.keyboard.press("Escape");
   await publicPage.bringToFront();
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "受け渡し済み",
@@ -133,5 +161,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/taiyaq-staff-mobile.png",
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });

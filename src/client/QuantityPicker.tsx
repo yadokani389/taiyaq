@@ -33,24 +33,27 @@ export function QuantityPicker({
       if (
         disabled ||
         !activeId ||
+        event.isComposing ||
         target?.closest(
           'input, textarea, select, [contenteditable="true"], dialog',
         )
       )
         return;
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        event.preventDefault();
-        if (!event.repeat) onSubmit();
-        return;
-      }
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat)
         return;
-      if (/^\d$/.test(event.key)) {
+      if (event.key === "Enter" && !target?.closest("button, a")) {
         event.preventDefault();
+        onSubmit();
+        return;
+      }
+      if (!/^(\d|ArrowDown|ArrowUp|ArrowRight|ArrowLeft)$/.test(event.key))
+        return;
+      event.preventDefault();
+      target?.blur();
+      if (/^\d$/.test(event.key)) {
         setQuantity(activeId, Number(event.key));
       }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
         const index = available.findIndex(({ id }) => id === activeId);
         setSelected(
           available[
@@ -60,7 +63,6 @@ export function QuantityPicker({
         );
       }
       if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-        event.preventDefault();
         setQuantity(
           activeId,
           values[activeId] + (event.key === "ArrowRight" ? 1 : -1),

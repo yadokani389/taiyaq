@@ -57,6 +57,9 @@ export function Staff() {
   const state = poll.data;
   const day = state?.day.id;
   const disabled = busy || Boolean(pending);
+  const receiving = state?.orders.find(
+    ({ number, status }) => number === Number(search) && status === "ready",
+  );
 
   useEffect(() => {
     function navigate(event: KeyboardEvent) {
@@ -144,6 +147,17 @@ export function Staff() {
     )
       return;
     act({ type, day, orderId: order.id });
+  }
+  function receive() {
+    if (
+      disabled ||
+      !receiving ||
+      !window.confirm(`${receiving.number}番を受け渡し済みにしますか？`)
+    )
+      return;
+    finish(receiving, "complete");
+    setSearch("");
+    document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
   }
   if (!token)
     return (
@@ -284,7 +298,7 @@ export function Staff() {
                   onClick={submit}
                 >
                   {view === "order" ? "注文を登録" : "焼き上がりを登録"}
-                  <kbd>Ctrl ↵</kbd>
+                  <kbd>↵</kbd>
                 </button>
               </>
             )}
@@ -294,8 +308,10 @@ export function Staff() {
               <h2>
                 注文一覧 <span>{state.orders.length}</span>
               </h2>
-              <label className="ticket-search">
-                <span className="sr-only">整理券番号で検索</span>
+              <div className="ticket-search">
+                <label className="sr-only" htmlFor="ticket-search">
+                  整理券番号で検索
+                </label>
                 <input
                   id="ticket-search"
                   type="text"
@@ -311,25 +327,27 @@ export function Staff() {
                       setSearch("");
                       event.currentTarget.blur();
                     }
-                    const target = state.orders.find(
-                      ({ number, status }) =>
-                        number === Number(search) && status === "ready",
-                    );
                     if (
                       event.key === "Enter" &&
                       !event.repeat &&
-                      target &&
-                      !disabled &&
-                      window.confirm(
-                        `${target.number}番を受け渡し済みにしますか？`,
-                      )
+                      !event.nativeEvent.isComposing &&
+                      !event.ctrlKey &&
+                      !event.metaKey &&
+                      !event.altKey
                     ) {
-                      finish(target, "complete");
-                      setSearch("");
+                      event.preventDefault();
+                      receive();
                     }
                   }}
                 />
-              </label>
+                <button
+                  className="primary"
+                  disabled={disabled || !receiving}
+                  onClick={receive}
+                >
+                  受け渡し <kbd>↵</kbd>
+                </button>
+              </div>
             </div>
             <div className="stock-strip">
               {FLAVORS.map(({ id, name }) => (

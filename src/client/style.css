@@ -369,10 +369,22 @@ kbd {
 .stock-strip small {
   font-size: 10px;
 }
+.orders-panel > .panel-heading {
+  flex-wrap: wrap;
+}
+.ticket-search {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+}
 .ticket-search input {
   width: 155px;
+  min-width: 0;
   background: #fff;
   font-size: 13px;
+}
+.ticket-search button {
+  white-space: nowrap;
 }
 .order-row {
   padding: 22px 0;
