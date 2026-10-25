@@ -86,9 +86,16 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.screenshot({ path: "/tmp/taiyaq-staff.png", fullPage: true });
   const publicPage = await context.newPage();
   await publicPage.goto("/");
-  await publicPage
-    .getByRole("button", { name: "3番 受け取り可能", exact: true })
-    .click();
+  const ticket = publicPage.getByLabel("整理券番号で確認", { exact: true });
+  await ticket.fill("100");
+  await publicPage.getByRole("button", { name: "確認", exact: true }).click();
+  expect(
+    await ticket.evaluate(
+      (input: HTMLInputElement) => input.validity.rangeOverflow,
+    ),
+  ).toBe(true);
+  await ticket.fill("3");
+  await publicPage.getByRole("button", { name: "確認", exact: true }).click();
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "受け取り可能",
   );

@@ -117,6 +117,19 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     ).status,
   ).toBe(409);
   await command({ type: "complete", day: today, orderId: second.id });
+  const db = await mf.getD1Database("DB");
+  await expect(
+    db
+      .prepare("UPDATE days SET last_number = 100 WHERE id = ?")
+      .bind(today)
+      .run(),
+  ).rejects.toThrow("CHECK");
+  await expect(
+    db
+      .prepare("UPDATE orders SET number = 100 WHERE id = ?")
+      .bind(second.id)
+      .run(),
+  ).rejects.toThrow("CHECK");
   const snapshot = (await (await request("/api/staff/state")).json()) as State;
   expect(snapshot.stock.tsubuan).toBe(0);
   expect(

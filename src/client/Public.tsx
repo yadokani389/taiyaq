@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   FLAVORS,
+  MAX_TICKET_NUMBER,
   STATUS_LABELS,
   type PublicOrder,
   type PublicState,
@@ -92,8 +93,8 @@ export function Public({ display = false }: { display?: boolean }) {
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={100}
-                    placeholder="1〜100"
+                    max={MAX_TICKET_NUMBER}
+                    placeholder={`1〜${MAX_TICKET_NUMBER}`}
                     value={number}
                     onChange={(event) => setNumber(event.target.value)}
                     required

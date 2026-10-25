@@ -1,5 +1,6 @@
 import {
   FLAVORS,
+  MAX_TICKET_NUMBER,
   zeroCounts,
   type Command,
   type CommandResult,
@@ -65,8 +66,8 @@ export function applyCommand(
         .map(({ number }) => number),
     );
     let number = state.day.lastNumber;
-    for (let attempts = 0; attempts < 100; attempts++) {
-      number = (number % 100) + 1;
+    for (let attempts = 0; attempts < MAX_TICKET_NUMBER; attempts++) {
+      number = (number % MAX_TICKET_NUMBER) + 1;
       if (!occupied.has(number)) break;
     }
     if (occupied.has(number))

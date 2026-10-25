@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as v from "valibot";
 import {
   FLAVORS,
+  MAX_TICKET_NUMBER,
   STATUS_LABELS,
   total,
   zeroCounts,
@@ -320,7 +321,11 @@ export function Staff() {
                   placeholder="整理券番号 /"
                   value={search}
                   onChange={(event) =>
-                    setSearch(event.target.value.replace(/\D/g, "").slice(0, 3))
+                    setSearch(
+                      event.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, String(MAX_TICKET_NUMBER).length),
+                    )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {

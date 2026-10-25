@@ -1,3 +1,5 @@
+export const MAX_TICKET_NUMBER = 99;
+
 export const FLAVORS = [
   { id: "tsubuan", name: "粒あん" },
   { id: "custard", name: "カスタード" },

@@ -87,9 +87,12 @@ describe("order allocation", () => {
   });
   it("cycles tickets, skips occupied numbers and refuses a full pool", () => {
     const s = state();
-    for (let n = 1; n <= 100; n++)
+    for (let n = 1; n <= 99; n++)
       expect(order(s, { tsubuan: 1 }).number).toBe(n);
+    expect(s.day.lastNumber).toBe(99);
     expect(() => order(s, { tsubuan: 1 })).toThrow("空き");
+    run(s, { type: "cancel", day: s.day.id, orderId: s.orders[0]!.id });
+    expect(order(s, { custard: 1 }).number).toBe(1);
     run(s, { type: "cancel", day: s.day.id, orderId: s.orders[41]!.id });
     expect(order(s, { custard: 1 }).number).toBe(42);
     expect(s.orders[0]!.number).toBe(1);
