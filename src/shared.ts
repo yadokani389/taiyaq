@@ -19,7 +19,6 @@ export type Day = {
   id: string;
   lastNumber: number;
   nextSequence: number;
-  closedAt: string | null;
 };
 export type Order = {
   id: string;
@@ -34,27 +33,25 @@ export type Order = {
 };
 export type State = {
   revision: number;
-  day: Day | null;
+  day: Day;
   flavors: Flavor[];
   stock: Counts;
   orders: Order[];
 };
 export type Command =
-  | { type: "start"; day: string }
-  | { type: "close"; day: string }
   | { type: "order"; day: string; items: Counts }
   | { type: "production"; day: string; items: Counts }
   | { type: "adjust"; day: string; items: Counts }
   | { type: "complete" | "cancel"; day: string; orderId: string }
   | { type: "flavor"; flavor: Flavor };
 export type CommandRequest = { operationId: string; command: Command };
-export type CommandResult = { order?: Order; day?: string };
+export type CommandResult = { order?: Order };
 export type PublicOrder = Pick<
   Order,
   "id" | "day" | "number" | "status" | "items"
 >;
 export type PublicState = {
-  day: string | null;
+  day: string;
   flavors: Array<
     Pick<Flavor, "id" | "enabled"> & { waitMinutes: number | null }
   >;

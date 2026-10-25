@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { japanDate, type State } from "../../src/shared";
+import { type State } from "../../src/shared";
 
 test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screens", async ({
   page,
@@ -15,8 +15,6 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.goto("/staff");
   await page.getByLabel("スタッフ用トークン").fill(token);
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
-  await page.getByLabel("営業日", { exact: true }).fill(japanDate());
-  await page.getByRole("button", { name: "営業を開始", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "粒あん 1個", exact: true }),
   ).toBeVisible();

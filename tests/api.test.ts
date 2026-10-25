@@ -1,15 +1,18 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { build } from "esbuild";
 import { Miniflare } from "miniflare";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import {
   zeroCounts,
+  japanDate,
   type Command,
   type CommandResult,
   type State,
 } from "../src/shared";
+import { execute, history, loadState } from "../src/server/store";
 
 let mf: Miniflare;
+const today = japanDate();
 const token = crypto.randomUUID();
 async function request(path: string, body?: unknown, authenticated = true) {
   return mf.dispatchFetch(`http://localhost${path}`, {
@@ -49,8 +52,10 @@ beforeAll(async () => {
     bindings: { STAFF_API_TOKEN: token },
   });
   const db = await mf.getD1Database("DB");
-  const sql = await readFile("migrations/0001_initial.sql", "utf8");
-  await db.exec(sql.replace(/\n/g, " "));
+  for (const file of (await readdir("migrations")).sort()) {
+    const sql = await readFile(`migrations/${file}`, "utf8");
+    await db.exec(sql.replace(/\n/g, " "));
+  }
 }, 30000);
 afterAll(async () => {
   await mf?.dispose();
@@ -60,18 +65,19 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   expect((await request("/api/staff/state", undefined, false)).status).toBe(
     401,
   );
-  expect((await request("/api/status", undefined, false)).status).toBe(200);
-  await command({ type: "start", day: "2026-10-25" });
+  const status = await request("/api/status", undefined, false);
+  expect(status.status).toBe(200);
+  expect(await status.json()).toMatchObject({ day: today, orders: [] });
   const first = (
     await command({
       type: "order",
-      day: "2026-10-25",
+      day: today,
       items: { ...zeroCounts(), tsubuan: 1, custard: 1 },
     })
   ).order!;
   const production: Command = {
     type: "production",
-    day: "2026-10-25",
+    day: today,
     items: { ...zeroCounts(), tsubuan: 2 },
   };
   const operationId = crypto.randomUUID();
@@ -82,7 +88,7 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   const second = (
     await command({
       type: "order",
-      day: "2026-10-25",
+      day: today,
       items: { ...zeroCounts(), tsubuan: 1 },
     })
   ).order!;
@@ -96,7 +102,7 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     Array.from({ length: 4 }, () =>
       command({
         type: "order",
-        day: "2026-10-25",
+        day: today,
         items: { ...zeroCounts(), custard: 1 },
       }),
     ),
@@ -106,31 +112,15 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     (
       await request("/api/staff/commands", {
         operationId: crypto.randomUUID(),
-        command: { type: "complete", day: "2026-10-25", orderId: first.id },
+        command: { type: "complete", day: today, orderId: first.id },
       })
     ).status,
   ).toBe(409);
-  await command({ type: "complete", day: "2026-10-25", orderId: second.id });
-  let snapshot = (await (await request("/api/staff/state")).json()) as State;
+  await command({ type: "complete", day: today, orderId: second.id });
+  const snapshot = (await (await request("/api/staff/state")).json()) as State;
   expect(snapshot.stock.tsubuan).toBe(0);
   expect(
     snapshot.orders.find(({ id }) => id === first.id)!.allocated.tsubuan,
-  ).toBe(1);
-  for (const order of snapshot.orders)
-    await command({ type: "cancel", day: "2026-10-25", orderId: order.id });
-  await command({ type: "close", day: "2026-10-25" });
-  await command({ type: "start", day: "2026-10-26" });
-  snapshot = (await (await request("/api/staff/state")).json()) as State;
-  expect(snapshot.stock).toEqual(zeroCounts());
-  expect(snapshot.orders).toHaveLength(0);
-  expect(
-    (
-      await command({
-        type: "order",
-        day: "2026-10-26",
-        items: { ...zeroCounts(), custard: 1 },
-      })
-    ).order!.number,
   ).toBe(1);
   const oldOrder = (await (
     await request(`/api/orders/${second.id}`, undefined, false)
@@ -138,13 +128,82 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     order: { status: string; day: string };
   };
   expect(oldOrder.order.status).toBe("completed");
-  expect(oldOrder.order.day).toBe("2026-10-25");
+  expect(oldOrder.order.day).toBe(today);
   expect(oldOrder.order).not.toHaveProperty("allocated");
   expect(oldOrder.order).not.toHaveProperty("sequence");
   expect(oldOrder.order).not.toHaveProperty("createdAt");
   expect(
-    (await (
-      await request("/api/staff/history/2026-10-25")
-    ).json()) as unknown[],
+    (await (await request(`/api/staff/history/${today}`)).json()) as unknown[],
   ).toHaveLength(6);
 }, 30000);
+
+it("switches at midnight in Japan while retaining history, settings and retry results", async () => {
+  const db = await mf.getD1Database("DB");
+  const beforeMidnight = new Date("2040-05-01T14:59:59.999Z");
+  const midnight = new Date("2040-05-01T15:00:00.000Z");
+  const operationId = crypto.randomUUID();
+  const request: Command = {
+    type: "order",
+    day: "2040-05-01",
+    items: { ...zeroCounts(), tsubuan: 1, custard: 1 },
+  };
+  const first = await execute(db, operationId, request, beforeMidnight);
+  await execute(
+    db,
+    crypto.randomUUID(),
+    {
+      type: "production",
+      day: request.day,
+      items: { ...zeroCounts(), tsubuan: 3 },
+    },
+    beforeMidnight,
+  );
+  const previous = await loadState(db, beforeMidnight);
+  await execute(
+    db,
+    crypto.randomUUID(),
+    {
+      type: "flavor",
+      flavor: { ...previous.flavors[0]!, cookingMinutes: 12, perBatch: 8 },
+    },
+    beforeMidnight,
+  );
+  const next = await loadState(db, midnight);
+  expect(next.day).toEqual({
+    id: "2040-05-02",
+    lastNumber: 0,
+    nextSequence: 1,
+  });
+  expect(next.stock).toEqual(zeroCounts());
+  expect(next.orders).toEqual([]);
+  expect(next.flavors[0]).toMatchObject({ cookingMinutes: 12, perBatch: 8 });
+  expect((await history(db, request.day))[0]).toMatchObject({
+    id: first.order!.id,
+    status: "waiting",
+    allocated: { tsubuan: 1, custard: 0 },
+  });
+  expect((await loadState(db, beforeMidnight)).stock.tsubuan).toBe(2);
+  expect(await execute(db, operationId, request, midnight)).toEqual(first);
+  await expect(
+    execute(db, crypto.randomUUID(), request, midnight),
+  ).rejects.toThrow("営業日");
+  const orders = await Promise.all(
+    Array.from({ length: 2 }, () =>
+      execute(
+        db,
+        crypto.randomUUID(),
+        {
+          type: "order",
+          day: "2040-05-02",
+          items: { ...zeroCounts(), tsubuan: 1 },
+        },
+        midnight,
+      ),
+    ),
+  );
+  expect(
+    orders.map(({ order }) => order!.number).sort((a, b) => a - b),
+  ).toEqual([1, 2]);
+  expect((await loadState(db, midnight)).orders).toHaveLength(2);
+  expect(await history(db, request.day)).toHaveLength(1);
+});

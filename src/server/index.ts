@@ -37,18 +37,18 @@ app.onError((error, c) => {
 const routes = app
   .get("/api/status", async (c) => {
     const state = await loadState(c.env.DB);
-    const open = state.day && !state.day.closedAt;
     const result: PublicState = {
-      day: open ? state.day!.id : null,
+      day: state.day.id,
       flavors: state.flavors.map((flavor) => ({
         id: flavor.id,
-        enabled: Boolean(open && flavor.enabled),
-        waitMinutes:
-          open && flavor.enabled ? estimateWait(state, flavor.id) : null,
+        enabled: flavor.enabled,
+        waitMinutes: flavor.enabled ? estimateWait(state, flavor.id) : null,
       })),
-      orders: open
-        ? state.orders.map(({ id, number, status }) => ({ id, number, status }))
-        : [],
+      orders: state.orders.map(({ id, number, status }) => ({
+        id,
+        number,
+        status,
+      })),
     };
     return c.json(result);
   })
@@ -57,7 +57,7 @@ const routes = app
     if (!order) throw new UserError("注文が見つかりません", 404);
     const state = await loadState(c.env.DB);
     const waitMinutes =
-      order.status === "waiting" && state.day?.id === order.day
+      order.status === "waiting" && state.day.id === order.day
         ? Math.max(
             ...FLAVORS.filter(
               ({ id }) => order.items[id] > order.allocated[id],

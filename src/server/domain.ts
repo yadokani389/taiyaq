@@ -51,35 +51,8 @@ export function applyCommand(
     state.flavors[index] = command.flavor;
     return {};
   }
-  if (command.type === "start") {
-    if (state.day && !state.day.closedAt)
-      throw new UserError("営業中です。先に営業を終了してください", 409);
-    state.day = {
-      id: command.day,
-      lastNumber: 0,
-      nextSequence: 1,
-      closedAt: null,
-    };
-    state.stock = zeroCounts();
-    state.orders = [];
-    return { day: command.day };
-  }
-  if (!state.day || state.day.closedAt || state.day.id !== command.day) {
+  if (state.day.id !== command.day) {
     throw new UserError("営業日が変わっています。画面を更新してください", 409);
-  }
-  if (command.type === "close") {
-    if (
-      state.orders.some(
-        ({ status }) => status === "waiting" || status === "ready",
-      )
-    ) {
-      throw new UserError(
-        "未受け取りの注文を確認してから営業を終了してください",
-        409,
-      );
-    }
-    state.day.closedAt = now;
-    return { day: state.day.id };
   }
   if (command.type === "order") {
     for (const { id, enabled } of state.flavors) {

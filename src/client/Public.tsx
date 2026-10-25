@@ -70,16 +70,6 @@ export function Public({ display = false }: { display?: boolean }) {
         <main className="empty-state">
           <h1>読み込み中…</h1>
         </main>
-      ) : !data.day ? (
-        <main className="empty-state">
-          <h1>ただいま営業時間外です</h1>
-          {detail.data ? (
-            <p>
-              {detail.data.order.day}　{detail.data.order.number}番：
-              {STATUS_LABELS[detail.data.order.status]}
-            </p>
-          ) : null}
-        </main>
       ) : (
         <main>
           {!display ? (

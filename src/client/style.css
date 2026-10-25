@@ -424,14 +424,6 @@ kbd {
   font-size: 12px;
   padding: 9px 12px;
 }
-.day-footer {
-  margin-top: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: var(--muted);
-}
 .empty-state {
   padding: 60px 20px;
   text-align: center;
@@ -439,11 +431,6 @@ kbd {
 }
 .empty-state h1 {
   margin-bottom: 18px;
-}
-.open-day {
-  display: grid;
-  gap: 15px;
-  padding-top: 25px;
 }
 .flavor-setting {
   padding: 0 0 20px;

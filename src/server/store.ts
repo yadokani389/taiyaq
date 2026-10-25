@@ -1,6 +1,7 @@
 import {
   FLAVORS,
   zeroCounts,
+  japanDate,
   type Command,
   type CommandResult,
   type Counts,
@@ -35,18 +36,22 @@ export function fromOrderRow(row: OrderRow): Order {
   };
 }
 
-export async function loadState(db: D1Database): Promise<State> {
+export async function loadState(
+  db: D1Database,
+  now = new Date(),
+): Promise<State> {
+  const today = japanDate(now);
   const [meta, days, stock, orders, flavors] = await db.batch([
     db.prepare("SELECT revision FROM app_state WHERE id = 1"),
-    db.prepare(
-      "SELECT * FROM days WHERE id = (SELECT active_day FROM app_state WHERE id = 1)",
-    ),
-    db.prepare(
-      "SELECT counts FROM inventory WHERE day = (SELECT active_day FROM app_state WHERE id = 1)",
-    ),
-    db.prepare(
-      "SELECT * FROM orders WHERE day = (SELECT active_day FROM app_state WHERE id = 1) AND status IN ('waiting', 'ready') ORDER BY sequence",
-    ),
+    db
+      .prepare("SELECT id, last_number, next_sequence FROM days WHERE id = ?")
+      .bind(today),
+    db.prepare("SELECT counts FROM inventory WHERE day = ?").bind(today),
+    db
+      .prepare(
+        "SELECT * FROM orders WHERE day = ? AND status IN ('waiting', 'ready') ORDER BY sequence",
+      )
+      .bind(today),
     db.prepare("SELECT * FROM flavors"),
   ]);
   const day = days!.results[0] as
@@ -54,7 +59,6 @@ export async function loadState(db: D1Database): Promise<State> {
         id: string;
         last_number: number;
         next_sequence: number;
-        closed_at: string | null;
       }
     | undefined;
   const settings = flavors!.results as Array<{
@@ -70,9 +74,8 @@ export async function loadState(db: D1Database): Promise<State> {
           id: day.id,
           lastNumber: day.last_number,
           nextSequence: day.next_sequence,
-          closedAt: day.closed_at,
         }
-      : null,
+      : { id: today, lastNumber: 0, nextSequence: 1 },
     stock: stock!.results[0]
       ? (JSON.parse((stock!.results[0] as { counts: string }).counts) as Counts)
       : zeroCounts(),
@@ -108,28 +111,20 @@ export async function execute(
   db: D1Database,
   operationId: string,
   command: Command,
+  now = new Date(),
 ): Promise<CommandResult> {
   const request = JSON.stringify(command);
   for (let attempt = 0; attempt < 5; attempt++) {
     const previous = await replay(db, operationId, request);
     if (previous) return previous;
-    const before = await loadState(db);
+    const before = await loadState(db, now);
     const after = structuredClone(before);
     let result: CommandResult;
     try {
-      if (
-        command.type === "start" &&
-        (await db
-          .prepare("SELECT id FROM days WHERE id = ?")
-          .bind(command.day)
-          .first())
-      ) {
-        throw new UserError("この営業日の履歴はすでにあります", 409);
-      }
       result = applyCommand(
         after,
         command,
-        new Date().toISOString(),
+        now.toISOString(),
         crypto.randomUUID(),
       );
     } catch (error) {
@@ -163,36 +158,28 @@ export async function execute(
           before.revision,
         ),
     ];
-    if (after.day) {
-      statements.push(
-        db
-          .prepare(
-            `INSERT INTO days (id, last_number, next_sequence, closed_at) SELECT ?, ?, ?, ? WHERE ${guard}
-        ON CONFLICT(id) DO UPDATE SET last_number = excluded.last_number, next_sequence = excluded.next_sequence, closed_at = excluded.closed_at`,
-          )
-          .bind(
-            after.day.id,
-            after.day.lastNumber,
-            after.day.nextSequence,
-            after.day.closedAt,
-            operationId,
-            revision,
-          ),
-      );
-      statements.push(
-        db
-          .prepare(
-            `INSERT INTO inventory (day, counts) SELECT ?, ? WHERE ${guard}
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO days (id, last_number, next_sequence) SELECT ?, ?, ? WHERE ${guard}
+        ON CONFLICT(id) DO UPDATE SET last_number = excluded.last_number, next_sequence = excluded.next_sequence`,
+        )
+        .bind(
+          after.day.id,
+          after.day.lastNumber,
+          after.day.nextSequence,
+          operationId,
+          revision,
+        ),
+    );
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO inventory (day, counts) SELECT ?, ? WHERE ${guard}
         ON CONFLICT(day) DO UPDATE SET counts = excluded.counts`,
-          )
-          .bind(
-            after.day.id,
-            JSON.stringify(after.stock),
-            operationId,
-            revision,
-          ),
-      );
-    }
+        )
+        .bind(after.day.id, JSON.stringify(after.stock), operationId, revision),
+    );
     if (changedOrders.length) {
       statements.push(
         db
@@ -222,15 +209,9 @@ export async function execute(
     statements.push(
       db
         .prepare(
-          `UPDATE app_state SET revision = ?, active_day = ? WHERE id = 1 AND revision = ? AND ${guard}`,
+          `UPDATE app_state SET revision = ? WHERE id = 1 AND revision = ? AND ${guard}`,
         )
-        .bind(
-          revision,
-          after.day?.id ?? null,
-          before.revision,
-          operationId,
-          revision,
-        ),
+        .bind(revision, before.revision, operationId, revision),
     );
     try {
       const committed = await db.batch(statements);
@@ -268,19 +249,15 @@ export async function history(db: D1Database, day: string): Promise<Order[]> {
 
 export async function listDays(db: D1Database): Promise<Day[]> {
   const result = await db
-    .prepare(
-      "SELECT id, last_number, next_sequence, closed_at FROM days ORDER BY id DESC",
-    )
+    .prepare("SELECT id, last_number, next_sequence FROM days ORDER BY id DESC")
     .all<{
       id: string;
       last_number: number;
       next_sequence: number;
-      closed_at: string | null;
     }>();
   return result.results.map((row) => ({
     id: row.id,
     lastNumber: row.last_number,
     nextSequence: row.next_sequence,
-    closedAt: row.closed_at,
   }));
 }

@@ -34,8 +34,6 @@ function counts(min: number) {
 }
 
 export const commandSchema = v.variant("type", [
-  v.strictObject({ type: v.literal("start"), day }),
-  v.strictObject({ type: v.literal("close"), day }),
   v.strictObject({ type: v.literal("order"), day, items: counts(0) }),
   v.strictObject({ type: v.literal("production"), day, items: counts(0) }),
   v.strictObject({ type: v.literal("adjust"), day, items: counts(-100) }),

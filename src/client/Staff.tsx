@@ -3,7 +3,6 @@ import * as v from "valibot";
 import {
   FLAVORS,
   STATUS_LABELS,
-  japanDate,
   total,
   zeroCounts,
   type Command,
@@ -54,10 +53,9 @@ export function Staff() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [startDay, setStartDay] = useState(japanDate);
   const poll = usePolling<State>(token ? "/api/staff/state" : null, token);
   const state = poll.data;
-  const day = state?.day && !state.day.closedAt ? state.day.id : undefined;
+  const day = state?.day.id;
   const disabled = busy || Boolean(pending);
 
   useEffect(() => {
@@ -204,7 +202,7 @@ export function Staff() {
         </button>
       </header>
       <div className="service-bar">
-        <span>{day ?? "営業していません"}</span>
+        <span>{day ?? "読み込み中…"}</span>
         <Freshness error={poll.error} updatedAt={poll.updatedAt} />
         <a href="/display" target="_blank" rel="noreferrer">
           店頭モニター ↗
@@ -250,70 +248,44 @@ export function Staff() {
                 <div className="panel-heading">
                   <h1>{view === "order" ? "注文受付" : "焼き上がり"}</h1>
                 </div>
-                {day ? (
-                  <>
-                    <QuantityPicker
-                      key={`${view}-${formVersion}`}
-                      values={view === "order" ? orderItems : productionItems}
-                      onChange={
-                        view === "order" ? setOrderItems : setProductionItems
-                      }
-                      disabled={disabled}
-                      unavailable={
-                        view === "order"
-                          ? state.flavors
-                              .filter(({ enabled }) => !enabled)
-                              .map(({ id }) => id)
-                          : []
-                      }
-                      production={view === "production"}
-                      onSubmit={submit}
-                    />
-                    <div className="entry-total">
-                      <span>合計</span>
-                      <strong>
-                        {total(view === "order" ? orderItems : productionItems)}
-                        <small>個</small>
-                      </strong>
-                      {view === "production" && total(productionItems) > 20 ? (
-                        <span>20個を超えています</span>
-                      ) : null}
-                    </div>
-                    <button
-                      className="primary submit"
-                      disabled={
-                        disabled ||
-                        total(
-                          view === "order" ? orderItems : productionItems,
-                        ) === 0
-                      }
-                      onClick={submit}
-                    >
-                      {view === "order" ? "注文を登録" : "焼き上がりを登録"}
-                      <kbd>Ctrl ↵</kbd>
-                    </button>
-                  </>
-                ) : (
-                  <form
-                    className="open-day"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      act({ type: "start", day: startDay });
-                    }}
-                  >
-                    <label htmlFor="start-day">営業日</label>
-                    <input
-                      id="start-day"
-                      type="date"
-                      value={startDay}
-                      onChange={(event) => setStartDay(event.target.value)}
-                      required
-                    />
-                    <button className="primary" disabled={disabled}>
-                      営業を開始
-                    </button>
-                  </form>
-                )}
+                <QuantityPicker
+                  key={`${view}-${formVersion}`}
+                  values={view === "order" ? orderItems : productionItems}
+                  onChange={
+                    view === "order" ? setOrderItems : setProductionItems
+                  }
+                  disabled={disabled}
+                  unavailable={
+                    view === "order"
+                      ? state.flavors
+                          .filter(({ enabled }) => !enabled)
+                          .map(({ id }) => id)
+                      : []
+                  }
+                  production={view === "production"}
+                  onSubmit={submit}
+                />
+                <div className="entry-total">
+                  <span>合計</span>
+                  <strong>
+                    {total(view === "order" ? orderItems : productionItems)}
+                    <small>個</small>
+                  </strong>
+                  {view === "production" && total(productionItems) > 20 ? (
+                    <span>20個を超えています</span>
+                  ) : null}
+                </div>
+                <button
+                  className="primary submit"
+                  disabled={
+                    disabled ||
+                    total(view === "order" ? orderItems : productionItems) === 0
+                  }
+                  onClick={submit}
+                >
+                  {view === "order" ? "注文を登録" : "焼き上がりを登録"}
+                  <kbd>Ctrl ↵</kbd>
+                </button>
               </>
             )}
           </section>
@@ -425,24 +397,6 @@ export function Staff() {
                 <div className="empty-state">未受け取りの注文はありません</div>
               ) : null}
             </div>
-            {day ? (
-              <footer className="day-footer">
-                <span>{day}</span>
-                <button
-                  disabled={disabled || state.orders.length > 0}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "営業を終了しますか？ 履歴は保存されます。",
-                      )
-                    )
-                      act({ type: "close", day });
-                  }}
-                >
-                  営業終了
-                </button>
-              </footer>
-            ) : null}
           </section>
         </main>
       )}
@@ -492,43 +446,41 @@ function Settings({
           />
         ))}
       </div>
-      {state.day && !state.day.closedAt ? (
-        <form
-          className="adjustment"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (
-              window.confirm(
-                "在庫を訂正しますか？ 未受け取りの注文への割り当ても再計算します。",
-              )
-            ) {
-              const fields = new FormData(event.currentTarget);
-              const items = zeroCounts();
-              for (const { id } of FLAVORS) items[id] = Number(fields.get(id));
-              act({ type: "adjust", day: state.day!.id, items });
-            }
-          }}
-        >
-          <h2>在庫の訂正</h2>
-          <p>増やす数は正、減らす数は負で入力</p>
-          {FLAVORS.map(({ id, name }) => (
-            <label key={id}>
-              {name}
-              <input
-                type="number"
-                min={-100}
-                max={100}
-                step={1}
-                name={id}
-                defaultValue={0}
-                disabled={disabled}
-                required
-              />
-            </label>
-          ))}
-          <button disabled={disabled}>在庫を訂正</button>
-        </form>
-      ) : null}
+      <form
+        className="adjustment"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (
+            window.confirm(
+              "在庫を訂正しますか？ 未受け取りの注文への割り当ても再計算します。",
+            )
+          ) {
+            const fields = new FormData(event.currentTarget);
+            const items = zeroCounts();
+            for (const { id } of FLAVORS) items[id] = Number(fields.get(id));
+            act({ type: "adjust", day: state.day.id, items });
+          }
+        }}
+      >
+        <h2>在庫の訂正</h2>
+        <p>増やす数は正、減らす数は負で入力</p>
+        {FLAVORS.map(({ id, name }) => (
+          <label key={id}>
+            {name}
+            <input
+              type="number"
+              min={-100}
+              max={100}
+              step={1}
+              name={id}
+              defaultValue={0}
+              disabled={disabled}
+              required
+            />
+          </label>
+        ))}
+        <button disabled={disabled}>在庫を訂正</button>
+      </form>
     </>
   );
 }
