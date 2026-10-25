@@ -10,8 +10,10 @@ export default defineConfig({
     domains: ["taiyaq.yadokani389.net"],
     workersDev: false,
     previewUrls: false,
+    assets: { notFoundHandling: "single-page-application" },
     observability: { enabled: true },
     env: {
+      ASSETS: bindings.assets(),
       DB: bindings.d1({ name: "taiyaq", id: databaseId }),
       STAFF_API_TOKEN: bindings.secret(),
     },

@@ -1,8 +1,10 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   plugins: [
+    react({ compiler: true }),
     cloudflare({
       persistState: {
         path: process.env.TAIYAQ_STATE_DIR ?? ".cloudflare/state",

@@ -11,7 +11,8 @@
     "typecheck": "vp check --no-fmt --no-lint",
     "db:migrate:local": "node scripts/migrate.ts --local",
     "db:migrate:remote": "node scripts/migrate.ts",
-    "deploy": "pnpm check && cf deploy --prebuilt --mode production"
+    "deploy": "pnpm check && cf deploy --prebuilt --mode production",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "hono": "^4.12.9",
