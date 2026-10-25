@@ -104,7 +104,8 @@ kbd {
   border-color: var(--accent);
   font-weight: 600;
 }
-.primary:hover:enabled {
+.primary:hover:enabled,
+button[aria-pressed="true"]:hover:enabled {
   background: #622824;
 }
 .text-button {
@@ -253,9 +254,12 @@ kbd {
   background: #faf6f2;
 }
 .quantity-row legend {
+  float: left;
+  width: 100%;
   font-size: 14px;
   font-weight: 600;
-  padding: 0 6px;
+  padding: 0;
+  margin-bottom: 8px;
 }
 .quantity-row legend small {
   margin-left: 10px;
@@ -282,6 +286,7 @@ kbd {
   background: #57714a;
 }
 .quantity-controls {
+  clear: both;
   display: flex;
   align-items: center;
   gap: 6px;
