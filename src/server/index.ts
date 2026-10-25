@@ -47,7 +47,7 @@ const routes = app
       orders: state.orders.map(({ id, number, status }) => ({
         id,
         number,
-        status,
+        status: status === "skipped" ? "ready" : status,
       })),
     };
     return c.json(result);
@@ -65,7 +65,16 @@ const routes = app
           )
         : 0;
     const { id, day, number, status, items } = order;
-    return c.json({ order: { id, day, number, status, items }, waitMinutes });
+    return c.json({
+      order: {
+        id,
+        day,
+        number,
+        status: status === "skipped" ? "ready" : status,
+        items,
+      },
+      waitMinutes,
+    });
   })
   .get("/api/staff/state", async (c) => c.json(await loadState(c.env.DB)))
   .get("/api/staff/days", async (c) => c.json(await listDays(c.env.DB)))

@@ -408,6 +408,9 @@ button[aria-pressed="true"]:hover:enabled {
 .order-row.ready .ticket-number {
   color: #386345;
 }
+.order-row.skipped .ticket-number {
+  color: var(--muted);
+}
 .order-content {
   flex: 1;
   min-width: 0;
@@ -822,8 +825,14 @@ button[aria-pressed="true"]:hover:enabled {
   .key-guide {
     white-space: normal;
   }
+  .order-row {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
   .order-actions {
+    grid-column: 2;
     flex-direction: row;
+    flex-wrap: wrap;
   }
   .notice,
   .error-banner,

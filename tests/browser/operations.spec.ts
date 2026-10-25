@@ -84,6 +84,17 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   expect(state.orders[1]!.items.custard).toBe(0);
   await page.getByRole("button", { name: /注文受付/ }).click();
   await page.screenshot({ path: "/tmp/taiyaq-staff.png", fullPage: true });
+  const search = page.getByRole("textbox", { name: "整理券番号で検索" });
+  const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
+  await page.keyboard.press("/");
+  await page.keyboard.type("3");
+  await page.keyboard.press("f");
+  await expect(page.locator(".order-row.skipped")).toContainText("03");
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("");
+  await page
+    .locator(".orders-panel")
+    .screenshot({ path: "/tmp/taiyaq-skipped.png" });
   const publicPage = await context.newPage();
   await publicPage.goto("/");
   const ticket = publicPage.getByLabel("整理券番号で確認", { exact: true });
@@ -99,6 +110,40 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "受け取り可能",
   );
+  const display = await context.newPage();
+  await display.goto("/display");
+  await expect(display.locator(".ready-numbers .number-grid")).toContainText(
+    "03",
+  );
+  await display.screenshot({
+    path: "/tmp/taiyaq-held-display.png",
+    fullPage: true,
+  });
+  await page.bringToFront();
+  await page.keyboard.type("3");
+  await expect(
+    page.getByRole("button", { name: "列に戻す ↵", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".notice")).toContainText("3番を列に戻しました");
+  await expect(receive).toBeEnabled();
+  await expect(search).toHaveValue("3");
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/taiyaq-skip-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await publicPage.bringToFront();
+  await expect(publicPage.locator(".your-order-detail")).toContainText(
+    "受け取り可能",
+  );
   await publicPage.setViewportSize({ width: 390, height: 844 });
   await publicPage.screenshot({
     path: "/tmp/taiyaq-customer.png",
@@ -109,16 +154,12 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  const display = await context.newPage();
-  await display.goto("/display");
   await expect(display.locator(".ready-numbers .number-grid")).toContainText(
     "03",
   );
   await display.screenshot({ path: "/tmp/taiyaq-display.png", fullPage: true });
   await page.bringToFront();
   await page.keyboard.press("/");
-  const search = page.getByRole("textbox", { name: "整理券番号で検索" });
-  const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
   await page.keyboard.type("1");
   await expect(receive).toBeDisabled();
   await page.keyboard.press("Enter");

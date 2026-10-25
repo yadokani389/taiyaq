@@ -97,6 +97,70 @@ describe("order allocation", () => {
     expect(order(s, { custard: 1 }).number).toBe(42);
     expect(s.orders[0]!.number).toBe(1);
   });
+  it("releases skipped orders and restores their original priority without taking ready items", () => {
+    const s = state();
+    const absent = order(s, { tsubuan: 2 });
+    const second = order(s, { tsubuan: 1 });
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 2 }),
+    });
+    expect(absent.status).toBe("ready");
+    run(s, { type: "skip", day: s.day.id, orderId: absent.id });
+    expect(absent.status).toBe("skipped");
+    expect(absent.allocated).toEqual(zeroCounts());
+    expect(absent.finishedAt).toBeNull();
+    expect(second.status).toBe("ready");
+    expect(s.stock.tsubuan).toBe(1);
+    expect(() =>
+      run(s, { type: "skip", day: s.day.id, orderId: absent.id }),
+    ).toThrow("保留");
+    expect(() =>
+      run(s, { type: "complete", day: s.day.id, orderId: absent.id }),
+    ).toThrow("保留");
+    s.day.lastNumber = 99;
+    const third = order(s, { tsubuan: 1 });
+    expect(third.number).toBe(3);
+    expect(third.status).toBe("ready");
+    const fourth = order(s, { tsubuan: 1 });
+    run(s, { type: "resume", day: s.day.id, orderId: absent.id });
+    run(s, { type: "adjust", day: s.day.id, items: counts({ custard: 1 }) });
+    run(s, { type: "adjust", day: s.day.id, items: counts({ custard: -1 }) });
+    expect(absent.sequence).toBe(1);
+    expect(absent.number).toBe(1);
+    expect(absent.status).toBe("waiting");
+    expect(second.status).toBe("ready");
+    expect(second.allocated.tsubuan).toBe(1);
+    expect(third.status).toBe("ready");
+    expect(third.allocated.tsubuan).toBe(1);
+    expect(() =>
+      run(s, { type: "resume", day: s.day.id, orderId: absent.id }),
+    ).toThrow("保留");
+    run(s, {
+      type: "adjust",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(absent.allocated.tsubuan).toBe(1);
+    expect(absent.status).toBe("waiting");
+    expect(fourth.allocated.tsubuan).toBe(0);
+    expect(second.status).toBe("ready");
+    expect(third.status).toBe("ready");
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(absent.status).toBe("ready");
+    expect(fourth.status).toBe("waiting");
+    run(s, { type: "skip", day: s.day.id, orderId: second.id });
+    expect(fourth.status).toBe("ready");
+    run(s, { type: "cancel", day: s.day.id, orderId: second.id });
+    expect(second.status).toBe("cancelled");
+    expect(second.finishedAt).not.toBeNull();
+    expect(s.stock.tsubuan).toBe(0);
+  });
   it("keeps accepted orders when a flavor is stopped and rejects stale dates", () => {
     const s = state();
     const existing = order(s, { imoan: 1 });

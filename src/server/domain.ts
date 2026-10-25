@@ -20,13 +20,24 @@ export class UserError extends Error {
 export function allocate(state: State): void {
   const available = { ...state.stock };
   for (const order of state.orders) {
-    if (order.status !== "waiting" && order.status !== "ready") continue;
+    if (order.status !== "waiting") continue;
     for (const { id } of FLAVORS) available[id] += order.allocated[id];
+  }
+  for (const order of state.orders.toSorted(
+    (a, b) => b.sequence - a.sequence,
+  )) {
+    if (
+      order.status !== "ready" ||
+      !FLAVORS.some(({ id }) => available[id] < 0 && order.allocated[id] > 0)
+    )
+      continue;
+    for (const { id } of FLAVORS) available[id] += order.allocated[id];
+    order.status = "waiting";
   }
   for (const order of state.orders.toSorted(
     (a, b) => a.sequence - b.sequence,
   )) {
-    if (order.status !== "waiting" && order.status !== "ready") continue;
+    if (order.status !== "waiting") continue;
     for (const { id } of FLAVORS) {
       order.allocated[id] = Math.min(order.items[id], available[id]);
       available[id] -= order.allocated[id];
@@ -62,7 +73,10 @@ export function applyCommand(
     }
     const occupied = new Set(
       state.orders
-        .filter(({ status }) => status === "waiting" || status === "ready")
+        .filter(
+          ({ status }) =>
+            status === "waiting" || status === "ready" || status === "skipped",
+        )
         .map(({ number }) => number),
     );
     let number = state.day.lastNumber;
@@ -106,14 +120,27 @@ export function applyCommand(
   if (!order) throw new UserError("注文が見つかりません", 404);
   if (order.status === "completed" || order.status === "cancelled")
     throw new UserError("すでに終了した注文です", 409);
-  if (command.type === "complete" && order.status !== "ready")
-    throw new UserError("まだ全品が揃っていません", 409);
-  if (command.type === "cancel") {
-    for (const { id } of FLAVORS) state.stock[id] += order.allocated[id];
-    order.allocated = zeroCounts();
+  if (command.type === "resume") {
+    if (order.status !== "skipped")
+      throw new UserError("保留中の注文ではありません", 409);
+    order.status = "waiting";
+  } else {
+    if (order.status === "skipped" && command.type !== "cancel")
+      throw new UserError("保留中です。先に列に戻してください", 409);
+    if (command.type === "complete" && order.status !== "ready")
+      throw new UserError("まだ全品が揃っていません", 409);
+    if (command.type === "cancel" || command.type === "skip") {
+      for (const { id } of FLAVORS) state.stock[id] += order.allocated[id];
+      order.allocated = zeroCounts();
+    }
+    order.status =
+      command.type === "skip"
+        ? "skipped"
+        : command.type === "complete"
+          ? "completed"
+          : "cancelled";
+    if (command.type !== "skip") order.finishedAt = now;
   }
-  order.status = command.type === "complete" ? "completed" : "cancelled";
-  order.finishedAt = now;
   allocate(state);
   return { order };
 }

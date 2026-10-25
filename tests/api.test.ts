@@ -93,6 +93,42 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     })
   ).order!;
   expect(second.status).toBe("ready");
+  const skip: Command = { type: "skip", day: today, orderId: first.id };
+  const skipId = crypto.randomUUID();
+  await Promise.all([command(skip, skipId), command(skip, skipId)]);
+  const skipped = (await (await request("/api/staff/state")).json()) as State;
+  expect(skipped.orders.find(({ id }) => id === first.id)).toMatchObject({
+    status: "skipped",
+    allocated: zeroCounts(),
+    finishedAt: null,
+  });
+  expect(skipped.stock.tsubuan).toBe(1);
+  expect(
+    await (await request(`/api/orders/${first.id}`, undefined, false)).json(),
+  ).toMatchObject({
+    order: { id: first.id, number: 1, status: "ready" },
+  });
+  expect(
+    await (await request("/api/status", undefined, false)).json(),
+  ).toMatchObject({
+    orders: expect.arrayContaining([
+      { id: first.id, number: 1, status: "ready" },
+    ]),
+  });
+  await command({ type: "resume", day: today, orderId: first.id });
+  const restored = (await (await request("/api/staff/state")).json()) as State;
+  expect(restored.orders.find(({ id }) => id === first.id)).toMatchObject({
+    sequence: first.sequence,
+    status: "waiting",
+  });
+  expect(restored.orders.find(({ id }) => id === second.id)!.status).toBe(
+    "ready",
+  );
+  expect(
+    await (await request(`/api/orders/${first.id}`, undefined, false)).json(),
+  ).toMatchObject({
+    order: { id: first.id, status: "waiting" },
+  });
   const collision = await request("/api/staff/commands", {
     operationId,
     command: { ...production, items: { ...zeroCounts(), tsubuan: 3 } },

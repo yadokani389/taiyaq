@@ -58,9 +58,11 @@ export function Staff() {
   const state = poll.data;
   const day = state?.day.id;
   const disabled = busy || Boolean(pending);
-  const receiving = state?.orders.find(
-    ({ number, status }) => number === Number(search) && status === "ready",
+  const selectedOrder = state?.orders.find(
+    ({ number }) => number === Number(search),
   );
+  const canSkip =
+    selectedOrder?.status === "waiting" || selectedOrder?.status === "ready";
 
   useEffect(() => {
     function navigate(event: KeyboardEvent) {
@@ -106,6 +108,10 @@ export function Staff() {
         setProductionItems(zeroCounts());
         setFormVersion((version) => version + 1);
         setNotice("焼き上がりを登録しました");
+      } else if (request.command.type === "skip") {
+        setNotice(`${result.order!.number}番を保留にしました`);
+      } else if (request.command.type === "resume") {
+        setNotice(`${result.order!.number}番を列に戻しました`);
       } else setNotice("保存しました");
       if (request.command.type === "adjust")
         document.querySelector<HTMLFormElement>(".adjustment")?.reset();
@@ -140,7 +146,10 @@ export function Staff() {
     }
     act({ type: view === "order" ? "order" : "production", day, items });
   }
-  function finish(order: Order, type: "complete" | "cancel") {
+  function updateOrder(
+    order: Order,
+    type: "complete" | "cancel" | "skip" | "resume",
+  ) {
     if (!day) return;
     if (
       type === "cancel" &&
@@ -150,13 +159,24 @@ export function Staff() {
     act({ type, day, orderId: order.id });
   }
   function receive() {
+    if (disabled || !selectedOrder) return;
+    if (selectedOrder.status === "skipped") {
+      updateOrder(selectedOrder, "resume");
+      document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
+      return;
+    }
     if (
-      disabled ||
-      !receiving ||
-      !window.confirm(`${receiving.number}番を受け渡し済みにしますか？`)
+      selectedOrder.status !== "ready" ||
+      !window.confirm(`${selectedOrder.number}番を受け渡し済みにしますか？`)
     )
       return;
-    finish(receiving, "complete");
+    updateOrder(selectedOrder, "complete");
+    setSearch("");
+    document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
+  }
+  function skipSelected() {
+    if (disabled || !selectedOrder || !canSkip) return;
+    updateOrder(selectedOrder, "skip");
     setSearch("");
     document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
   }
@@ -331,26 +351,46 @@ export function Staff() {
                     if (event.key === "Escape") {
                       setSearch("");
                       event.currentTarget.blur();
+                      return;
                     }
                     if (
-                      event.key === "Enter" &&
-                      !event.repeat &&
-                      !event.nativeEvent.isComposing &&
-                      !event.ctrlKey &&
-                      !event.metaKey &&
-                      !event.altKey
-                    ) {
+                      event.repeat ||
+                      event.nativeEvent.isComposing ||
+                      event.ctrlKey ||
+                      event.metaKey ||
+                      event.altKey
+                    )
+                      return;
+                    if (event.key === "Enter") {
                       event.preventDefault();
                       receive();
+                    }
+                    if (event.key.toLowerCase() === "f") {
+                      event.preventDefault();
+                      skipSelected();
                     }
                   }}
                 />
                 <button
                   className="primary"
-                  disabled={disabled || !receiving}
+                  disabled={
+                    disabled ||
+                    (selectedOrder?.status !== "ready" &&
+                      selectedOrder?.status !== "skipped")
+                  }
                   onClick={receive}
                 >
-                  受け渡し <kbd>↵</kbd>
+                  {selectedOrder?.status === "skipped"
+                    ? "列に戻す"
+                    : "受け渡し"}{" "}
+                  <kbd>↵</kbd>
+                </button>
+                <button
+                  disabled={disabled || !canSkip}
+                  onClick={skipSelected}
+                  aria-keyshortcuts="F"
+                >
+                  飛ばす <kbd>F</kbd>
                 </button>
               </div>
             </div>
@@ -368,8 +408,11 @@ export function Staff() {
                 .filter(({ number }) => !search || number === Number(search))
                 .toSorted(
                   (a, b) =>
+                    Number(a.status === "skipped") -
+                      Number(b.status === "skipped") ||
                     Number(b.status === "ready") -
-                      Number(a.status === "ready") || a.sequence - b.sequence,
+                      Number(a.status === "ready") ||
+                    a.sequence - b.sequence,
                 )
                 .map((order) => (
                   <article
@@ -401,15 +444,27 @@ export function Staff() {
                         <button
                           className="primary"
                           disabled={disabled}
-                          onClick={() => finish(order, "complete")}
+                          onClick={() => updateOrder(order, "complete")}
                         >
                           受け渡し
                         </button>
                       ) : null}
                       <button
+                        className={order.status === "skipped" ? "primary" : ""}
+                        disabled={disabled}
+                        onClick={() =>
+                          updateOrder(
+                            order,
+                            order.status === "skipped" ? "resume" : "skip",
+                          )
+                        }
+                      >
+                        {order.status === "skipped" ? "列に戻す" : "飛ばす"}
+                      </button>
+                      <button
                         className="text-button"
                         disabled={disabled}
-                        onClick={() => finish(order, "cancel")}
+                        onClick={() => updateOrder(order, "cancel")}
                       >
                         取消
                       </button>

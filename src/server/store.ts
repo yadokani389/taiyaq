@@ -49,7 +49,7 @@ export async function loadState(
     db.prepare("SELECT counts FROM inventory WHERE day = ?").bind(today),
     db
       .prepare(
-        "SELECT * FROM orders WHERE day = ? AND status IN ('waiting', 'ready') ORDER BY sequence",
+        "SELECT * FROM orders WHERE day = ? AND status IN ('waiting', 'ready', 'skipped') ORDER BY sequence",
       )
       .bind(today),
     db.prepare("SELECT * FROM flavors"),
