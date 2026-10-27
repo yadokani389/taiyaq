@@ -18,6 +18,23 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(
     page.getByRole("button", { name: "粒あん 1個", exact: true }),
   ).toBeVisible();
+  for (const [key, heading] of [
+    ["k", "焼き上がり"],
+    ["l", "販売設定"],
+    [";", "履歴"],
+    ["j", "注文受付"],
+  ] as const) {
+    await page.keyboard.press(key);
+    await expect(
+      page.getByRole("heading", { name: heading, exact: true }),
+    ).toBeVisible();
+  }
+  await page.keyboard.press("/");
+  await page.keyboard.press("k");
+  await expect(
+    page.getByRole("heading", { name: "注文受付", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.keyboard.press("1");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("1");
@@ -88,7 +105,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
   await page.keyboard.press("/");
   await page.keyboard.type("3");
-  await page.keyboard.press("f");
+  await page.keyboard.press(".");
   await expect(page.locator(".order-row.skipped")).toContainText("03");
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");

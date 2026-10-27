@@ -20,10 +20,10 @@ import { QuantityPicker } from "./QuantityPicker";
 
 type View = "order" | "production" | "settings" | "history";
 const views: Array<{ id: View; label: string; key: string }> = [
-  { id: "order", label: "注文受付", key: "O" },
-  { id: "production", label: "焼き上がり", key: "B" },
-  { id: "settings", label: "販売設定", key: "S" },
-  { id: "history", label: "履歴", key: "H" },
+  { id: "order", label: "注文受付", key: "J" },
+  { id: "production", label: "焼き上がり", key: "K" },
+  { id: "settings", label: "販売設定", key: "L" },
+  { id: "history", label: "履歴", key: ";" },
 ];
 
 function storedRequest(): CommandRequest | undefined {
@@ -67,6 +67,7 @@ export function Staff() {
   useEffect(() => {
     function navigate(event: KeyboardEvent) {
       if (
+        event.isComposing ||
         event.ctrlKey ||
         event.metaKey ||
         event.altKey ||
@@ -365,7 +366,7 @@ export function Staff() {
                       event.preventDefault();
                       receive();
                     }
-                    if (event.key.toLowerCase() === "f") {
+                    if (event.key === ".") {
                       event.preventDefault();
                       skipSelected();
                     }
@@ -388,9 +389,9 @@ export function Staff() {
                 <button
                   disabled={disabled || !canSkip}
                   onClick={skipSelected}
-                  aria-keyshortcuts="F"
+                  aria-keyshortcuts="."
                 >
-                  飛ばす <kbd>F</kbd>
+                  飛ばす <kbd>.</kbd>
                 </button>
               </div>
             </div>
