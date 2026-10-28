@@ -33,6 +33,7 @@ export type Order = {
   sequence: number;
   number: number;
   status: OrderStatus;
+  prioritySequence: number | null;
   items: Counts;
   allocated: Counts;
   createdAt: string;
@@ -50,7 +51,13 @@ export type Command =
   | { type: "production"; day: string; items: Counts }
   | { type: "adjust"; day: string; items: Counts }
   | {
-      type: "complete" | "cancel" | "skip" | "resume";
+      type:
+        | "complete"
+        | "cancel"
+        | "skip"
+        | "resume"
+        | "prioritize"
+        | "unprioritize";
       day: string;
       orderId: string;
     }
@@ -67,6 +74,14 @@ export type PublicState = {
   >;
   orders: Array<Pick<PublicOrder, "id" | "number" | "status">>;
 };
+
+export function compareAllocationOrder(a: Order, b: Order): number {
+  return (
+    Number(a.prioritySequence === null) - Number(b.prioritySequence === null) ||
+    (a.prioritySequence ?? 0) - (b.prioritySequence ?? 0) ||
+    a.sequence - b.sequence
+  );
+}
 
 export function zeroCounts(): Counts {
   return Object.fromEntries(FLAVORS.map(({ id }) => [id, 0])) as Counts;

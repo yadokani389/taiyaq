@@ -184,6 +184,95 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   expect(
     (await (await request(`/api/staff/history/${today}`)).json()) as unknown[],
   ).toHaveLength(6);
+  await command({
+    type: "flavor",
+    flavor: { ...snapshot.flavors[1]!, cookingMinutes: 15, perBatch: 1 },
+  });
+  const priority = concurrent[3]!.order!;
+  const nextPriority = concurrent[0]!.order!;
+  const prioritize: Command = {
+    type: "prioritize",
+    day: today,
+    orderId: priority.id,
+  };
+  const priorityOperationId = crypto.randomUUID();
+  const [designated, duplicate] = await Promise.all([
+    command(prioritize, priorityOperationId),
+    command(prioritize, priorityOperationId),
+  ]);
+  expect(duplicate).toEqual(designated);
+  await command({ type: "prioritize", day: today, orderId: nextPriority.id });
+  await command(prioritize);
+  const prioritized = (await (
+    await request("/api/staff/state")
+  ).json()) as State;
+  const currentPriority = prioritized.orders.find(
+    ({ id }) => id === priority.id,
+  )!;
+  expect(currentPriority.prioritySequence).toBe(
+    designated.order!.prioritySequence,
+  );
+  expect(currentPriority.prioritySequence!).toBeLessThan(
+    prioritized.orders.find(({ id }) => id === nextPriority.id)!
+      .prioritySequence!,
+  );
+  expect(await history(db, today)).toContainEqual(currentPriority);
+  const publicPriority = (await (
+    await request(`/api/orders/${priority.id}`, undefined, false)
+  ).json()) as {
+    order: Record<string, unknown>;
+    waitMinutes: number;
+  };
+  expect(publicPriority.waitMinutes).toBe(15);
+  expect(publicPriority.order.status).toBe("waiting");
+  expect(publicPriority.order).not.toHaveProperty("prioritySequence");
+  expect(
+    await (await request(`/api/orders/${first.id}`, undefined, false)).json(),
+  ).toMatchObject({ waitMinutes: 45 });
+  await command({
+    type: "production",
+    day: today,
+    items: { ...zeroCounts(), custard: 1 },
+  });
+  const ready = (await (await request("/api/staff/state")).json()) as State;
+  expect(ready.orders.find(({ id }) => id === priority.id)).toMatchObject({
+    status: "ready",
+    prioritySequence: null,
+  });
+  expect(await command(prioritize, priorityOperationId)).toEqual(designated);
+  const beforeInvalidAdjustment = await loadState(db);
+  const invalidAdjustment = await request("/api/staff/commands", {
+    operationId: crypto.randomUUID(),
+    command: {
+      type: "adjust",
+      day: today,
+      items: { ...zeroCounts(), tsubuan: 1, custard: -1 },
+    },
+  });
+  expect(invalidAdjustment.status).toBe(409);
+  expect(await loadState(db)).toEqual(beforeInvalidAdjustment);
+  for (const type of ["prioritize", "unprioritize"] as const) {
+    expect(
+      (
+        await request("/api/staff/commands", {
+          operationId: crypto.randomUUID(),
+          command: { type, day: today, orderId: priority.id },
+        })
+      ).status,
+    ).toBe(409);
+  }
+  await expect(
+    db
+      .prepare("UPDATE orders SET priority_sequence = 1 WHERE id = ?")
+      .bind(priority.id)
+      .run(),
+  ).rejects.toThrow("CHECK");
+  await command({ type: "prioritize", day: today, orderId: first.id });
+  const finalState = await loadState(db);
+  expect(finalState.orders.find(({ id }) => id === priority.id)).toMatchObject({
+    status: "ready",
+    allocated: { custard: 1 },
+  });
 }, 30000);
 
 it("switches at midnight in Japan while retaining history, settings and retry results", async () => {

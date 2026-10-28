@@ -6,7 +6,7 @@ import {
   type Counts,
   type State,
 } from "../src/shared";
-import { applyCommand } from "../src/server/domain";
+import { applyCommand, estimateWait } from "../src/server/domain";
 import * as v from "valibot";
 import { commandSchema } from "../src/validation";
 
@@ -59,7 +59,7 @@ describe("order allocation", () => {
     expect(s.stock.tsubuan).toBe(2);
     expect(second.status).toBe("ready");
   });
-  it("corrects inventory without restoring delivered items or completing unfinished orders", () => {
+  it("corrects waiting inventory without taking ready or delivered items", () => {
     const s = state();
     const first = order(s, { tsubuan: 1 });
     expect(() =>
@@ -75,8 +75,22 @@ describe("order allocation", () => {
       run(s, { type: "cancel", day: s.day.id, orderId: first.id }),
     ).toThrow("終了");
     const second = order(s, { tsubuan: 1 });
+    const before = structuredClone(s);
+    expect(() =>
+      run(s, { type: "adjust", day: s.day.id, items: counts({ tsubuan: -1 }) }),
+    ).toThrow("受け取り可能");
+    expect(s).toEqual(before);
+    const third = order(s, { tsubuan: 2 });
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
     run(s, { type: "adjust", day: s.day.id, items: counts({ tsubuan: -1 }) });
-    expect(second.status).toBe("waiting");
+    expect(second.status).toBe("ready");
+    expect(second.allocated.tsubuan).toBe(1);
+    expect(third.status).toBe("waiting");
+    expect(third.allocated.tsubuan).toBe(0);
     expect(() =>
       run(s, {
         type: "adjust",
@@ -84,6 +98,141 @@ describe("order allocation", () => {
         items: counts({ tsubuan: -1 }),
       }),
     ).toThrow("受け渡し済み");
+  });
+  it("moves partial reservations to a priority order while keeping ready orders ready", () => {
+    const s = state();
+    const first = order(s, { tsubuan: 2, custard: 1 });
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    const priority = order(s, { tsubuan: 1 });
+    run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+    expect(first.allocated.tsubuan).toBe(0);
+    expect(priority).toMatchObject({
+      status: "ready",
+      prioritySequence: null,
+      sequence: 2,
+      number: 2,
+      allocated: { tsubuan: 1 },
+    });
+    run(s, { type: "prioritize", day: s.day.id, orderId: first.id });
+    expect(first.status).toBe("waiting");
+    expect(priority.status).toBe("ready");
+    expect(priority.allocated.tsubuan).toBe(1);
+    for (const type of ["prioritize", "unprioritize"] as const) {
+      expect(() =>
+        run(s, { type, day: s.day.id, orderId: priority.id }),
+      ).toThrow("準備中");
+    }
+  });
+  it("keeps priority in designation order across batches and sends re-designations to the back", () => {
+    const s = state();
+    const regular = order(s, { tsubuan: 3 });
+    const first = order(s, { tsubuan: 2, custard: 1 });
+    const second = order(s, { tsubuan: 2 });
+    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    run(s, { type: "prioritize", day: s.day.id, orderId: first.id });
+    const originalPriority = second.prioritySequence;
+    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    expect(second.prioritySequence).toBe(originalPriority);
+    run(s, { type: "unprioritize", day: s.day.id, orderId: second.id });
+    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    expect(first.prioritySequence!).toBeLessThan(second.prioritySequence!);
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 2 }),
+    });
+    expect(first.allocated.tsubuan).toBe(2);
+    expect(first.prioritySequence).not.toBeNull();
+    expect(second.allocated.tsubuan).toBe(0);
+    const independent = order(s, { kurikinton: 1 });
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ kurikinton: 1, custard: 1 }),
+    });
+    expect(independent.status).toBe("ready");
+    expect(first.status).toBe("ready");
+    expect(first.prioritySequence).toBeNull();
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(second.status).toBe("waiting");
+    expect(second.allocated.tsubuan).toBe(1);
+    expect(second.prioritySequence).not.toBeNull();
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(second.status).toBe("ready");
+    expect(second.prioritySequence).toBeNull();
+    expect(regular.allocated.tsubuan).toBe(0);
+  });
+  it("recalculates partial reservations when priority is removed", () => {
+    const s = state();
+    const regular = order(s, { tsubuan: 2 });
+    const priority = order(s, { tsubuan: 2 });
+    run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(priority.allocated.tsubuan).toBe(1);
+    run(s, { type: "unprioritize", day: s.day.id, orderId: priority.id });
+    expect(priority.prioritySequence).toBeNull();
+    expect(priority.allocated.tsubuan).toBe(0);
+    expect(regular.allocated.tsubuan).toBe(1);
+  });
+  it.each(["skip", "cancel"] as const)(
+    "clears priority and releases reservations on %s",
+    (type) => {
+      const s = state();
+      const regular = order(s, { tsubuan: 1 });
+      const priority = order(s, { tsubuan: 2 });
+      run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+      run(s, {
+        type: "production",
+        day: s.day.id,
+        items: counts({ tsubuan: 1 }),
+      });
+      run(s, { type, day: s.day.id, orderId: priority.id });
+      expect(priority.prioritySequence).toBeNull();
+      expect(priority.allocated).toEqual(zeroCounts());
+      expect(regular.status).toBe("ready");
+      expect(() =>
+        run(s, { type: "prioritize", day: s.day.id, orderId: priority.id }),
+      ).toThrow();
+      if (type === "skip") {
+        run(s, { type: "resume", day: s.day.id, orderId: priority.id });
+        expect(priority.prioritySequence).toBeNull();
+        expect(priority.status).toBe("waiting");
+        expect(regular.status).toBe("ready");
+      }
+    },
+  );
+  it("estimates waits using allocation priority instead of ticket order", () => {
+    const s = state();
+    s.flavors[0]!.perBatch = 1;
+    const regular = order(s, { tsubuan: 2 });
+    const priority = order(s, { tsubuan: 1 });
+    run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+    expect(estimateWait(s, "tsubuan", priority)).toBe(15);
+    expect(estimateWait(s, "tsubuan", regular)).toBe(45);
+    expect(estimateWait(s, "tsubuan")).toBe(60);
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(estimateWait(s, "tsubuan", regular)).toBe(30);
+    expect(priority.status).toBe("ready");
   });
   it("cycles tickets, skips occupied numbers and refuses a full pool", () => {
     const s = state();
@@ -188,6 +337,8 @@ it("validates empty, fractional, unknown and out-of-range input at the API bound
     { type: "order", day: "2026-10-25", items: { tsubuan: 1.5 } },
     { type: "order", day: "2026-10-25", items: { tsubuan: 101 } },
     { type: "order", day: "2026-10-25", items: { other: 1 } },
+    { type: "prioritize", day: "2026-10-25", orderId: "invalid" },
+    { type: "unprioritize", day: "2026-02-30", orderId: crypto.randomUUID() },
     {
       type: "flavor",
       flavor: { id: "tsubuan", enabled: true, cookingMinutes: 0, perBatch: 10 },

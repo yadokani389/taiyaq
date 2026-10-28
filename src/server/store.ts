@@ -14,12 +14,13 @@ import { applyCommand, UserError } from "./domain";
 
 type OrderRow = Omit<
   Order,
-  "items" | "allocated" | "createdAt" | "finishedAt"
+  "items" | "allocated" | "createdAt" | "finishedAt" | "prioritySequence"
 > & {
   items: string;
   allocated: string;
   created_at: string;
   finished_at: string | null;
+  priority_sequence: number | null;
 };
 
 export function fromOrderRow(row: OrderRow): Order {
@@ -29,6 +30,7 @@ export function fromOrderRow(row: OrderRow): Order {
     sequence: row.sequence,
     number: row.number,
     status: row.status,
+    prioritySequence: row.priority_sequence,
     items: JSON.parse(row.items) as Counts,
     allocated: JSON.parse(row.allocated) as Counts,
     createdAt: row.created_at,
@@ -184,12 +186,12 @@ export async function execute(
       statements.push(
         db
           .prepare(
-            `INSERT INTO orders (id, day, sequence, number, status, items, allocated, created_at, finished_at)
+            `INSERT INTO orders (id, day, sequence, number, status, priority_sequence, items, allocated, created_at, finished_at)
         SELECT json_extract(value, '$.id'), json_extract(value, '$.day'), json_extract(value, '$.sequence'),
-          json_extract(value, '$.number'), json_extract(value, '$.status'), json_extract(value, '$.items'),
+          json_extract(value, '$.number'), json_extract(value, '$.status'), json_extract(value, '$.prioritySequence'), json_extract(value, '$.items'),
           json_extract(value, '$.allocated'), json_extract(value, '$.createdAt'), json_extract(value, '$.finishedAt')
         FROM json_each(?) WHERE ${guard}
-        ON CONFLICT(id) DO UPDATE SET status = excluded.status, allocated = excluded.allocated, finished_at = excluded.finished_at`,
+        ON CONFLICT(id) DO UPDATE SET status = excluded.status, priority_sequence = excluded.priority_sequence, allocated = excluded.allocated, finished_at = excluded.finished_at`,
           )
           .bind(JSON.stringify(changedOrders), operationId, revision),
       );

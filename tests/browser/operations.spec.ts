@@ -230,5 +230,95 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     path: "/tmp/taiyaq-staff-mobile.png",
     fullPage: true,
   });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole("button", { name: /注文受付/ }).click();
+  const firstOrder = page.locator(".order-row").filter({
+    has: page.locator(".ticket-number", { hasText: /^01$/ }),
+  });
+  const secondOrder = page.locator(".order-row").filter({
+    has: page.locator(".ticket-number", { hasText: /^02$/ }),
+  });
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await secondOrder
+    .getByRole("button", { name: "優先する", exact: true })
+    .click();
+  await expect(page.locator(".notice")).toContainText(
+    "2番が受け取り可能になりました",
+  );
+  await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
+  await expect(firstOrder).toContainText("確保 0");
+  await firstOrder
+    .getByRole("button", { name: "優先する", exact: true })
+    .click();
+  await expect(firstOrder.locator(".status-label")).toHaveText("優先待ち");
+  await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
+  await expect(page.locator(".order-list .ticket-number")).toHaveText([
+    "02",
+    "01",
+  ]);
+  await expect(page).toHaveURL(/\/staff$/);
+  await expect(page).toHaveTitle(/taiyaq/);
+  await expect(page.locator("vite-error-overlay")).toHaveCount(0);
+  await page.screenshot({
+    path: "/tmp/taiyaq-priority-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .locator(".orders-panel")
+    .screenshot({ path: "/tmp/taiyaq-priority-mobile.png" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.keyboard.press("/");
+  await page.keyboard.type("1");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  const removePriority = firstOrder.getByRole("button", {
+    name: "優先を解除",
+    exact: true,
+  });
+  await expect(removePriority).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".notice")).toContainText(
+    "1番の優先を解除しました",
+  );
+  await expect(firstOrder.locator(".status-label")).toHaveText("準備中");
+  await expect(search).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(
+    firstOrder.getByRole("button", { name: "優先する", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(firstOrder.locator(".status-label")).toHaveText("優先待ち");
+  await page.keyboard.press("/");
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await expect(firstOrder.locator(".status-label")).toHaveText("優先待ち");
+  await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
+  await publicPage.goto("/");
+  await publicPage.getByLabel("整理券番号で確認", { exact: true }).fill("1");
+  await publicPage.getByRole("button", { name: "確認", exact: true }).click();
+  await expect(publicPage.locator(".your-order-detail")).toContainText(
+    "準備中",
+  );
+  await expect(publicPage.locator(".your-order-detail")).not.toContainText(
+    "優先待ち",
+  );
+  await display.reload();
+  await expect(display.locator(".ready-numbers .number-grid")).toContainText(
+    "02",
+  );
+  await expect(
+    display.locator(".ready-numbers .number-grid"),
+  ).not.toContainText("01");
+  expect(consoleErrors).toEqual([]);
   expect(errors).toEqual([]);
 });

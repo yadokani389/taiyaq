@@ -4,6 +4,7 @@ import {
   FLAVORS,
   MAX_TICKET_NUMBER,
   STATUS_LABELS,
+  compareAllocationOrder,
   total,
   zeroCounts,
   type Command,
@@ -113,6 +114,14 @@ export function Staff() {
         setNotice(`${result.order!.number}番を保留にしました`);
       } else if (request.command.type === "resume") {
         setNotice(`${result.order!.number}番を列に戻しました`);
+      } else if (request.command.type === "prioritize") {
+        setNotice(
+          result.order!.status === "ready"
+            ? `${result.order!.number}番が受け取り可能になりました`
+            : `${result.order!.number}番を優先にしました`,
+        );
+      } else if (request.command.type === "unprioritize") {
+        setNotice(`${result.order!.number}番の優先を解除しました`);
       } else setNotice("保存しました");
       if (request.command.type === "adjust")
         document.querySelector<HTMLFormElement>(".adjustment")?.reset();
@@ -149,7 +158,13 @@ export function Staff() {
   }
   function updateOrder(
     order: Order,
-    type: "complete" | "cancel" | "skip" | "resume",
+    type:
+      | "complete"
+      | "cancel"
+      | "skip"
+      | "resume"
+      | "prioritize"
+      | "unprioritize",
   ) {
     if (!day) return;
     if (
@@ -158,6 +173,8 @@ export function Staff() {
     )
       return;
     act({ type, day, orderId: order.id });
+    if (type === "prioritize" || type === "unprioritize")
+      document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
   }
   function receive() {
     if (disabled || !selectedOrder) return;
@@ -413,11 +430,11 @@ export function Staff() {
                       Number(b.status === "skipped") ||
                     Number(b.status === "ready") -
                       Number(a.status === "ready") ||
-                    a.sequence - b.sequence,
+                    compareAllocationOrder(a, b),
                 )
                 .map((order) => (
                   <article
-                    className={`order-row ${order.status}`}
+                    className={`order-row ${order.status}${order.prioritySequence === null ? "" : " priority"}`}
                     key={order.id}
                   >
                     <strong className="ticket-number">
@@ -425,7 +442,9 @@ export function Staff() {
                     </strong>
                     <div className="order-content">
                       <span className={`status-label ${order.status}`}>
-                        {STATUS_LABELS[order.status]}
+                        {order.prioritySequence === null
+                          ? STATUS_LABELS[order.status]
+                          : "優先待ち"}
                       </span>
                       <div className="order-items">
                         {FLAVORS.filter(({ id }) => order.items[id] > 0).map(
@@ -441,6 +460,24 @@ export function Staff() {
                       </div>
                     </div>
                     <div className="order-actions">
+                      {order.status === "waiting" ? (
+                        <button
+                          disabled={disabled}
+                          aria-pressed={order.prioritySequence !== null}
+                          onClick={() =>
+                            updateOrder(
+                              order,
+                              order.prioritySequence === null
+                                ? "prioritize"
+                                : "unprioritize",
+                            )
+                          }
+                        >
+                          {order.prioritySequence === null
+                            ? "優先する"
+                            : "優先を解除"}
+                        </button>
+                      ) : null}
                       {order.status === "ready" ? (
                         <button
                           className="primary"
@@ -531,7 +568,7 @@ function Settings({
           event.preventDefault();
           if (
             window.confirm(
-              "在庫を訂正しますか？ 未受け取りの注文への割り当ても再計算します。",
+              "在庫を訂正しますか？ 準備中の注文への割り当ても再計算します。",
             )
           ) {
             const fields = new FormData(event.currentTarget);

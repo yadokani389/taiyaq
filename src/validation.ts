@@ -58,6 +58,16 @@ export const commandSchema = v.variant("type", [
     orderId: v.pipe(v.string(), v.uuid()),
   }),
   v.strictObject({
+    type: v.literal("prioritize"),
+    day,
+    orderId: v.pipe(v.string(), v.uuid()),
+  }),
+  v.strictObject({
+    type: v.literal("unprioritize"),
+    day,
+    orderId: v.pipe(v.string(), v.uuid()),
+  }),
+  v.strictObject({
     type: v.literal("flavor"),
     flavor: v.strictObject({
       id: v.picklist(FLAVORS.map(({ id }) => id)),

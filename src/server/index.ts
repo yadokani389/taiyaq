@@ -61,7 +61,7 @@ const routes = app
         ? Math.max(
             ...FLAVORS.filter(
               ({ id }) => order.items[id] > order.allocated[id],
-            ).map(({ id }) => estimateWait(state, id, order.sequence) ?? 0),
+            ).map(({ id }) => estimateWait(state, id, order) ?? 0),
           )
         : 0;
     const { id, day, number, status, items } = order;

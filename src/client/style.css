@@ -423,6 +423,10 @@ button[aria-pressed="true"]:hover:enabled {
 .status-label.ready {
   color: #386345;
 }
+.order-row.priority .ticket-number,
+.order-row.priority .status-label {
+  color: var(--accent);
+}
 .order-items {
   display: flex;
   gap: 8px 18px;

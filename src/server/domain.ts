@@ -2,9 +2,11 @@ import {
   FLAVORS,
   MAX_TICKET_NUMBER,
   zeroCounts,
+  compareAllocationOrder,
   type Command,
   type CommandResult,
   type FlavorId,
+  type Order,
   type State,
 } from "../shared";
 
@@ -23,20 +25,7 @@ export function allocate(state: State): void {
     if (order.status !== "waiting") continue;
     for (const { id } of FLAVORS) available[id] += order.allocated[id];
   }
-  for (const order of state.orders.toSorted(
-    (a, b) => b.sequence - a.sequence,
-  )) {
-    if (
-      order.status !== "ready" ||
-      !FLAVORS.some(({ id }) => available[id] < 0 && order.allocated[id] > 0)
-    )
-      continue;
-    for (const { id } of FLAVORS) available[id] += order.allocated[id];
-    order.status = "waiting";
-  }
-  for (const order of state.orders.toSorted(
-    (a, b) => a.sequence - b.sequence,
-  )) {
+  for (const order of state.orders.toSorted(compareAllocationOrder)) {
     if (order.status !== "waiting") continue;
     for (const { id } of FLAVORS) {
       order.allocated[id] = Math.min(order.items[id], available[id]);
@@ -47,6 +36,7 @@ export function allocate(state: State): void {
     )
       ? "ready"
       : "waiting";
+    if (order.status === "ready") order.prioritySequence = null;
   }
   state.stock = available;
 }
@@ -92,6 +82,7 @@ export function applyCommand(
       sequence: state.day.nextSequence++,
       number,
       status: "waiting" as const,
+      prioritySequence: null,
       items: command.items,
       allocated: zeroCounts(),
       createdAt: now,
@@ -107,10 +98,13 @@ export function applyCommand(
       const available =
         state.stock[id] +
         state.orders
-          .filter(({ status }) => status === "waiting" || status === "ready")
+          .filter(({ status }) => status === "waiting")
           .reduce((sum, order) => sum + order.allocated[id], 0);
       if (available + command.items[id] < 0)
-        throw new UserError("受け渡し済みの商品は在庫から減らせません", 409);
+        throw new UserError(
+          "受け取り可能・受け渡し済みの商品は在庫から減らせません",
+          409,
+        );
     }
     for (const { id } of FLAVORS) state.stock[id] += command.items[id];
     allocate(state);
@@ -120,7 +114,17 @@ export function applyCommand(
   if (!order) throw new UserError("注文が見つかりません", 404);
   if (order.status === "completed" || order.status === "cancelled")
     throw new UserError("すでに終了した注文です", 409);
-  if (command.type === "resume") {
+  if (command.type === "prioritize" || command.type === "unprioritize") {
+    if (order.status !== "waiting")
+      throw new UserError("準備中の注文だけ優先を変更できます", 409);
+    if (command.type === "prioritize") {
+      order.prioritySequence ??=
+        Math.max(
+          0,
+          ...state.orders.map((value) => value.prioritySequence ?? 0),
+        ) + 1;
+    } else order.prioritySequence = null;
+  } else if (command.type === "resume") {
     if (order.status !== "skipped")
       throw new UserError("保留中の注文ではありません", 409);
     order.status = "waiting";
@@ -133,6 +137,7 @@ export function applyCommand(
       for (const { id } of FLAVORS) state.stock[id] += order.allocated[id];
       order.allocated = zeroCounts();
     }
+    order.prioritySequence = null;
     order.status =
       command.type === "skip"
         ? "skipped"
@@ -148,14 +153,15 @@ export function applyCommand(
 export function estimateWait(
   state: State,
   flavorId: FlavorId,
-  throughSequence = Infinity,
+  throughOrder?: Order,
 ): number | null {
   const flavor = state.flavors.find(({ id }) => id === flavorId);
   if (!flavor) return null;
   const demand = state.orders
     .filter(
-      ({ status, sequence }) =>
-        status === "waiting" && sequence <= throughSequence,
+      (order) =>
+        order.status === "waiting" &&
+        (!throughOrder || compareAllocationOrder(order, throughOrder) <= 0),
     )
     .reduce(
       (sum, order) => sum + order.items[flavorId] - order.allocated[flavorId],
@@ -163,10 +169,8 @@ export function estimateWait(
     );
   return (
     Math.ceil(
-      Math.max(
-        0,
-        demand + (throughSequence === Infinity ? 1 : 0) - state.stock[flavorId],
-      ) / flavor.perBatch,
+      Math.max(0, demand + (throughOrder ? 0 : 1) - state.stock[flavorId]) /
+        flavor.perBatch,
     ) * flavor.cookingMinutes
   );
 }
