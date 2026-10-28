@@ -718,8 +718,23 @@ button[aria-pressed="true"]:hover:enabled {
 .display-instruction {
   font-size: 22px;
   text-align: center;
-  padding: 28px 0;
   color: var(--muted);
+}
+.display-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-around;
+  gap: 20px;
+  padding: 20px 0;
+}
+.display-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  text-decoration: none;
 }
 .sr-only {
   position: absolute;
@@ -901,6 +916,21 @@ button[aria-pressed="true"]:hover:enabled {
   }
   .display-page .ready-numbers .number-grid > span {
     font-size: 50px;
+  }
+  .display-footer {
+    flex-wrap: nowrap;
+    gap: 16px;
+  }
+  .display-instruction {
+    flex: 1;
+    font-size: 16px;
+  }
+  .display-qr {
+    font-size: 12px;
+  }
+  .display-qr svg {
+    width: 128px;
+    height: 128px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

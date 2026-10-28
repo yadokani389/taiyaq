@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   FLAVORS,
   MAX_TICKET_NUMBER,
@@ -51,6 +52,7 @@ export function Public({ display = false }: { display?: boolean }) {
     history.replaceState(null, "", url);
   }
   const data = status.data;
+  const publicUrl = new URL("/", location.href).href;
   const ready = data?.orders.filter(({ status }) => status === "ready") ?? [];
   const waiting =
     data?.orders.filter(({ status }) => status === "waiting") ?? [];
@@ -209,9 +211,21 @@ export function Public({ display = false }: { display?: boolean }) {
               </div>
             </section>
           ) : (
-            <p className="display-instruction">
-              整理券を持って受け取り口へお越しください
-            </p>
+            <footer className="display-footer">
+              <p className="display-instruction">
+                整理券を持って受け取り口へお越しください
+              </p>
+              <a className="display-qr" href={publicUrl}>
+                <QRCodeSVG
+                  value={publicUrl}
+                  size={176}
+                  marginSize={4}
+                  role="img"
+                  title="注文状況ページのQRコード"
+                />
+                <span>スマホで注文状況を確認</span>
+              </a>
+            </footer>
           )}
         </main>
       )}
