@@ -5,6 +5,7 @@ import {
   MAX_TICKET_NUMBER,
   STATUS_LABELS,
   compareAllocationOrder,
+  estimateOrderWait,
   total,
   zeroCounts,
   type Command,
@@ -432,83 +433,95 @@ export function Staff() {
                       Number(a.status === "ready") ||
                     compareAllocationOrder(a, b),
                 )
-                .map((order) => (
-                  <article
-                    className={`order-row ${order.status}${order.prioritySequence === null ? "" : " priority"}`}
-                    key={order.id}
-                  >
-                    <strong className="ticket-number">
-                      {order.number.toString().padStart(2, "0")}
-                    </strong>
-                    <div className="order-content">
-                      <span className={`status-label ${order.status}`}>
-                        {order.prioritySequence === null
-                          ? STATUS_LABELS[order.status]
-                          : "優先待ち"}
-                      </span>
-                      <div className="order-items">
-                        {FLAVORS.filter(({ id }) => order.items[id] > 0).map(
-                          ({ id, name }) => (
-                            <span key={id}>
-                              {name} <b>{order.items[id]}</b>
-                              {order.status === "waiting" ? (
-                                <small>確保 {order.allocated[id]}</small>
-                              ) : null}
-                            </span>
-                          ),
-                        )}
+                .map((order) => {
+                  const waitMinutes = estimateOrderWait(state, order);
+                  return (
+                    <article
+                      className={`order-row ${order.status}${order.prioritySequence === null ? "" : " priority"}`}
+                      key={order.id}
+                    >
+                      <strong className="ticket-number">
+                        {order.number.toString().padStart(2, "0")}
+                      </strong>
+                      <div className="order-content">
+                        <span className={`status-label ${order.status}`}>
+                          {order.prioritySequence === null
+                            ? STATUS_LABELS[order.status]
+                            : "優先待ち"}
+                        </span>
+                        {order.status === "waiting" ? (
+                          <p className="order-wait">
+                            {waitMinutes === 0
+                              ? "そろそろできます"
+                              : `約${waitMinutes}分後`}
+                          </p>
+                        ) : null}
+                        <div className="order-items">
+                          {FLAVORS.filter(({ id }) => order.items[id] > 0).map(
+                            ({ id, name }) => (
+                              <span key={id}>
+                                {name} <b>{order.items[id]}</b>
+                                {order.status === "waiting" ? (
+                                  <small>確保 {order.allocated[id]}</small>
+                                ) : null}
+                              </span>
+                            ),
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="order-actions">
-                      {order.status === "waiting" ? (
+                      <div className="order-actions">
+                        {order.status === "waiting" ? (
+                          <button
+                            disabled={disabled}
+                            aria-pressed={order.prioritySequence !== null}
+                            onClick={() =>
+                              updateOrder(
+                                order,
+                                order.prioritySequence === null
+                                  ? "prioritize"
+                                  : "unprioritize",
+                              )
+                            }
+                          >
+                            {order.prioritySequence === null
+                              ? "優先する"
+                              : "優先を解除"}
+                          </button>
+                        ) : null}
+                        {order.status === "ready" ? (
+                          <button
+                            className="primary"
+                            disabled={disabled}
+                            onClick={() => updateOrder(order, "complete")}
+                          >
+                            受け渡し
+                          </button>
+                        ) : null}
                         <button
+                          className={
+                            order.status === "skipped" ? "primary" : ""
+                          }
                           disabled={disabled}
-                          aria-pressed={order.prioritySequence !== null}
                           onClick={() =>
                             updateOrder(
                               order,
-                              order.prioritySequence === null
-                                ? "prioritize"
-                                : "unprioritize",
+                              order.status === "skipped" ? "resume" : "skip",
                             )
                           }
                         >
-                          {order.prioritySequence === null
-                            ? "優先する"
-                            : "優先を解除"}
+                          {order.status === "skipped" ? "列に戻す" : "飛ばす"}
                         </button>
-                      ) : null}
-                      {order.status === "ready" ? (
                         <button
-                          className="primary"
+                          className="text-button"
                           disabled={disabled}
-                          onClick={() => updateOrder(order, "complete")}
+                          onClick={() => updateOrder(order, "cancel")}
                         >
-                          受け渡し
+                          取消
                         </button>
-                      ) : null}
-                      <button
-                        className={order.status === "skipped" ? "primary" : ""}
-                        disabled={disabled}
-                        onClick={() =>
-                          updateOrder(
-                            order,
-                            order.status === "skipped" ? "resume" : "skip",
-                          )
-                        }
-                      >
-                        {order.status === "skipped" ? "列に戻す" : "飛ばす"}
-                      </button>
-                      <button
-                        className="text-button"
-                        disabled={disabled}
-                        onClick={() => updateOrder(order, "cancel")}
-                      >
-                        取消
-                      </button>
-                    </div>
-                  </article>
-                ))}
+                      </div>
+                    </article>
+                  );
+                })}
               {!state.orders.length ? (
                 <div className="empty-state">未受け取りの注文はありません</div>
               ) : null}

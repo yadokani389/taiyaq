@@ -5,9 +5,9 @@ import { secureHeaders } from "hono/secure-headers";
 import { HTTPException } from "hono/http-exception";
 import { validator } from "hono/validator";
 import * as v from "valibot";
-import { FLAVORS, type PublicState } from "../shared";
+import { estimateOrderWait, estimateWait, type PublicState } from "../shared";
 import { commandRequestSchema } from "../validation";
-import { estimateWait, UserError } from "./domain";
+import { UserError } from "./domain";
 import { execute, history, listDays, loadState, orderDetails } from "./store";
 
 type Bindings = { DB: D1Database; STAFF_API_TOKEN: string; ASSETS?: Fetcher };
@@ -56,14 +56,7 @@ const routes = app
     const order = await orderDetails(c.env.DB, c.req.param("id"));
     if (!order) throw new UserError("注文が見つかりません", 404);
     const state = await loadState(c.env.DB);
-    const waitMinutes =
-      order.status === "waiting" && state.day.id === order.day
-        ? Math.max(
-            ...FLAVORS.filter(
-              ({ id }) => order.items[id] > order.allocated[id],
-            ).map(({ id }) => estimateWait(state, id, order) ?? 0),
-          )
-        : 0;
+    const waitMinutes = estimateOrderWait(state, order);
     const { id, day, number, status, items } = order;
     return c.json({
       order: {

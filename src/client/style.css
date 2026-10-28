@@ -427,6 +427,12 @@ button[aria-pressed="true"]:hover:enabled {
 .order-row.priority .status-label {
   color: var(--accent);
 }
+.order-wait {
+  margin-top: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .order-items {
   display: flex;
   gap: 8px 18px;

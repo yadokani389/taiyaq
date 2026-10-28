@@ -119,7 +119,11 @@ export function Public({ display = false }: { display?: boolean }) {
                   <div>
                     <h1>{STATUS_LABELS[detail.data.order.status]}</h1>
                     {detail.data.order.status === "waiting" ? (
-                      <p>待ち時間の目安：約{detail.data.waitMinutes}分</p>
+                      <p>
+                        {detail.data.waitMinutes === 0
+                          ? "そろそろできます"
+                          : `約${detail.data.waitMinutes}分後`}
+                      </p>
                     ) : null}
                     {detail.data.order.status === "ready" ? (
                       <p>整理券を持って受け取り口へお越しください</p>

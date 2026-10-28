@@ -40,6 +40,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press("1");
   await page.keyboard.press("Enter");
   await expect(page.locator(".notice")).toContainText("1番で受け付けました");
+  await expect(page.locator(".order-row .order-wait")).toHaveText(
+    "そろそろできます",
+  );
   await page.keyboard.press("1");
   await page.keyboard.press("NumpadEnter");
   await expect(page.locator(".notice")).toContainText("2番で受け付けました");
@@ -107,12 +110,17 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.type("3");
   await page.keyboard.press(".");
   await expect(page.locator(".order-row.skipped")).toContainText("03");
+  await expect(page.locator(".order-row.skipped .order-wait")).toHaveCount(0);
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
   await page
     .locator(".orders-panel")
     .screenshot({ path: "/tmp/taiyaq-skipped.png" });
   const publicPage = await context.newPage();
+  publicPage.on("pageerror", (error) => errors.push(error.message));
+  publicPage.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
   await publicPage.goto("/");
   const ticket = publicPage.getByLabel("整理券番号で確認", { exact: true });
   await ticket.fill("100");
@@ -312,6 +320,15 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(publicPage.locator(".your-order-detail")).not.toContainText(
     "優先待ち",
   );
+  await expect(publicPage.locator(".your-order-detail")).toContainText(
+    "そろそろできます",
+  );
+  await publicPage.setViewportSize({ width: 1440, height: 1000 });
+  await expect(publicPage).toHaveTitle(/taiyaq/);
+  await expect(publicPage.locator("vite-error-overlay")).toHaveCount(0);
+  await publicPage.screenshot({ path: "/tmp/taiyaq-public-wait-desktop.png" });
+  await publicPage.setViewportSize({ width: 390, height: 844 });
+  await publicPage.screenshot({ path: "/tmp/taiyaq-public-wait-soon.png" });
   await display.reload();
   await expect(display.locator(".ready-numbers .number-grid")).toContainText(
     "02",
@@ -319,6 +336,60 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(
     display.locator(".ready-numbers .number-grid"),
   ).not.toContainText("01");
+  await expect(firstOrder.locator(".order-wait")).toHaveText(
+    "そろそろできます",
+  );
+  await expect(secondOrder.locator(".order-wait")).toHaveCount(0);
+  await page.getByRole("button", { name: /注文受付/ }).click();
+  await page.getByRole("button", { name: "粒あん 3個", exact: true }).click();
+  await page.keyboard.press("9");
+  await page.keyboard.press("ArrowRight");
+  await page.getByRole("button", { name: /注文を登録/ }).click();
+  await expect(page.locator(".notice")).toContainText("4番で受け付けました");
+  const laterOrder = page.locator(".order-row").filter({
+    has: page.locator(".ticket-number", { hasText: /^04$/ }),
+  });
+  await expect(laterOrder.locator(".order-wait")).toHaveText("約15分後");
+  await publicPage.reload();
+  await publicPage.getByLabel("整理券番号で確認", { exact: true }).fill("4");
+  await publicPage.getByRole("button", { name: "確認", exact: true }).click();
+  await expect(publicPage.locator(".your-order-detail")).toContainText(
+    "約15分後",
+  );
+  expect(
+    await publicPage.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await publicPage.screenshot({ path: "/tmp/taiyaq-public-wait-later.png" });
+  await page.screenshot({
+    path: "/tmp/taiyaq-staff-wait-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".orders-panel").scrollIntoViewIfNeeded();
+  await expect(firstOrder.locator(".order-wait")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .locator(".orders-panel")
+    .screenshot({ path: "/tmp/taiyaq-staff-wait-mobile.png" });
+  await page
+    .getByRole("button", { name: /焼き上がり/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "粒あん 2個", exact: true }).click();
+  await page.getByRole("button", { name: /焼き上がりを登録/ }).click();
+  await expect(laterOrder.locator(".order-wait")).toHaveText(
+    "そろそろできます",
+  );
+  await publicPage.reload();
+  await expect(publicPage.locator(".your-order-detail")).toContainText(
+    "そろそろできます",
+  );
   expect(consoleErrors).toEqual([]);
   expect(errors).toEqual([]);
 });

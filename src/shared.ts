@@ -104,3 +104,41 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   completed: "受け渡し済み",
   cancelled: "キャンセル済み",
 };
+
+export function estimateWait(
+  state: State,
+  flavorId: FlavorId,
+  throughOrder?: Order,
+): number | null {
+  const flavor = state.flavors.find(({ id }) => id === flavorId);
+  if (!flavor) return null;
+  const demand = state.orders
+    .filter(
+      (order) =>
+        order.status === "waiting" &&
+        (!throughOrder || compareAllocationOrder(order, throughOrder) <= 0),
+    )
+    .reduce(
+      (sum, order) => sum + order.items[flavorId] - order.allocated[flavorId],
+      0,
+    );
+  return (
+    Math.ceil(
+      Math.max(0, demand + (throughOrder ? 0 : 1) - state.stock[flavorId]) /
+        flavor.perBatch,
+    ) * flavor.cookingMinutes
+  );
+}
+
+export function estimateOrderWait(state: State, order: Order): number {
+  if (order.status !== "waiting" || order.day !== state.day.id) return 0;
+  return Math.max(
+    0,
+    ...state.flavors
+      .filter(({ id }) => order.items[id] > order.allocated[id])
+      .map(
+        ({ id, cookingMinutes }) =>
+          (estimateWait(state, id, order) ?? 0) - cookingMinutes,
+      ),
+  );
+}

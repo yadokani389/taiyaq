@@ -223,12 +223,12 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     order: Record<string, unknown>;
     waitMinutes: number;
   };
-  expect(publicPriority.waitMinutes).toBe(15);
+  expect(publicPriority.waitMinutes).toBe(0);
   expect(publicPriority.order.status).toBe("waiting");
   expect(publicPriority.order).not.toHaveProperty("prioritySequence");
   expect(
     await (await request(`/api/orders/${first.id}`, undefined, false)).json(),
-  ).toMatchObject({ waitMinutes: 45 });
+  ).toMatchObject({ waitMinutes: 30 });
   await command({
     type: "production",
     day: today,

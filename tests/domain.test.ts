@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   FLAVORS,
+  estimateOrderWait,
+  estimateWait,
   zeroCounts,
   type Command,
   type Counts,
   type State,
 } from "../src/shared";
-import { applyCommand, estimateWait } from "../src/server/domain";
+import { applyCommand } from "../src/server/domain";
 import * as v from "valibot";
 import { commandSchema } from "../src/validation";
 
@@ -233,6 +235,72 @@ describe("order allocation", () => {
     });
     expect(estimateWait(s, "tsubuan", regular)).toBe(30);
     expect(priority.status).toBe("ready");
+  });
+  it.each([
+    [1, 0],
+    [10, 0],
+    [11, 15],
+    [20, 15],
+    [21, 30],
+  ])(
+    "estimates %i items from the next batch as %i minutes",
+    (quantity, minutes) => {
+      const s = state();
+      const waiting = order(s, { tsubuan: quantity });
+      expect(estimateOrderWait(s, waiting)).toBe(minutes);
+    },
+  );
+  it("estimates each order from the next batch until all unreserved flavors are ready", () => {
+    const s = state();
+    s.flavors[0]!.perBatch = 1;
+    s.flavors[0]!.cookingMinutes = 5;
+    s.flavors[1]!.perBatch = 1;
+    s.flavors[1]!.cookingMinutes = 12;
+    const first = order(s, { tsubuan: 2, custard: 1 });
+    const second = order(s, { tsubuan: 1 });
+    expect(estimateOrderWait(s, first)).toBe(5);
+    expect(estimateOrderWait(s, second)).toBe(10);
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ custard: 1 }),
+    });
+    expect(estimateOrderWait(s, first)).toBe(5);
+    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    expect(estimateOrderWait(s, first)).toBe(10);
+    expect(estimateOrderWait(s, second)).toBe(0);
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(second.status).toBe("ready");
+    expect(estimateOrderWait(s, second)).toBe(0);
+    expect(estimateOrderWait(s, first)).toBe(5);
+    run(s, { type: "skip", day: s.day.id, orderId: first.id });
+    expect(estimateOrderWait(s, first)).toBe(0);
+    expect(
+      estimateOrderWait(s, { ...first, status: "waiting", day: "2026-10-24" }),
+    ).toBe(0);
+  });
+  it("estimates one more item after waiting demand and reserved stock", () => {
+    const s = state();
+    expect(estimateWait(s, "tsubuan")).toBe(15);
+    const waiting = order(s, { tsubuan: 10, custard: 1 });
+    expect(estimateWait(s, "tsubuan")).toBe(30);
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 10 }),
+    });
+    expect(waiting.status).toBe("waiting");
+    expect(estimateWait(s, "tsubuan")).toBe(15);
+    run(s, {
+      type: "production",
+      day: s.day.id,
+      items: counts({ tsubuan: 1 }),
+    });
+    expect(estimateWait(s, "tsubuan")).toBe(0);
   });
   it("cycles tickets, skips occupied numbers and refuses a full pool", () => {
     const s = state();

@@ -5,8 +5,6 @@ import {
   compareAllocationOrder,
   type Command,
   type CommandResult,
-  type FlavorId,
-  type Order,
   type State,
 } from "../shared";
 
@@ -148,29 +146,4 @@ export function applyCommand(
   }
   allocate(state);
   return { order };
-}
-
-export function estimateWait(
-  state: State,
-  flavorId: FlavorId,
-  throughOrder?: Order,
-): number | null {
-  const flavor = state.flavors.find(({ id }) => id === flavorId);
-  if (!flavor) return null;
-  const demand = state.orders
-    .filter(
-      (order) =>
-        order.status === "waiting" &&
-        (!throughOrder || compareAllocationOrder(order, throughOrder) <= 0),
-    )
-    .reduce(
-      (sum, order) => sum + order.items[flavorId] - order.allocated[flavorId],
-      0,
-    );
-  return (
-    Math.ceil(
-      Math.max(0, demand + (throughOrder ? 0 : 1) - state.stock[flavorId]) /
-        flavor.perBatch,
-    ) * flavor.cookingMinutes
-  );
 }
