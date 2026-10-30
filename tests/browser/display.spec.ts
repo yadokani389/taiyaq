@@ -12,11 +12,10 @@ test("display links to the public page with a visible QR code", async ({
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        day: "2026-10-28",
         flavors: [],
         orders: Array.from({ length: 99 }, (_, index) => ({
           id: String(index + 1),
-          number: index + 1,
+          number: index + 1000,
           status: index < 60 ? "ready" : "waiting",
         })),
       },
@@ -46,6 +45,17 @@ test("display links to the public page with a visible QR code", async ({
         () =>
           document.documentElement.scrollWidth <= innerWidth &&
           document.documentElement.scrollHeight <= innerHeight,
+      ),
+    ).toBe(true);
+    expect(
+      await page.locator(".number-grid > span").evaluateAll((numbers) =>
+        numbers.every((number) => {
+          const range = document.createRange();
+          range.selectNodeContents(number);
+          const text = range.getBoundingClientRect();
+          const box = number.getBoundingClientRect();
+          return text.left >= box.left && text.right <= box.right;
+        }),
       ),
     ).toBe(true);
     await page.screenshot({

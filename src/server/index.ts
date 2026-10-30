@@ -8,7 +8,7 @@ import * as v from "valibot";
 import { estimateOrderWait, estimateWait, type PublicState } from "../shared";
 import { commandRequestSchema } from "../validation";
 import { UserError } from "./domain";
-import { execute, history, listDays, loadState, orderDetails } from "./store";
+import { execute, history, loadState, orderDetails } from "./store";
 
 type Bindings = { DB: D1Database; STAFF_API_TOKEN: string; ASSETS?: Fetcher };
 const app = new Hono<{ Bindings: Bindings }>();
@@ -38,7 +38,6 @@ const routes = app
   .get("/api/status", async (c) => {
     const state = await loadState(c.env.DB);
     const result: PublicState = {
-      day: state.day.id,
       flavors: state.flavors.map((flavor) => ({
         id: flavor.id,
         enabled: flavor.enabled,
@@ -57,11 +56,10 @@ const routes = app
     if (!order) throw new UserError("注文が見つかりません", 404);
     const state = await loadState(c.env.DB);
     const waitMinutes = estimateOrderWait(state, order);
-    const { id, day, number, status, items } = order;
+    const { id, number, status, items } = order;
     return c.json({
       order: {
         id,
-        day,
         number,
         status: status === "skipped" ? "ready" : status,
         items,
@@ -70,12 +68,7 @@ const routes = app
     });
   })
   .get("/api/staff/state", async (c) => c.json(await loadState(c.env.DB)))
-  .get("/api/staff/days", async (c) => c.json(await listDays(c.env.DB)))
-  .get("/api/staff/history/:day", async (c) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(c.req.param("day")))
-      throw new UserError("営業日が正しくありません");
-    return c.json(await history(c.env.DB, c.req.param("day")));
-  })
+  .get("/api/staff/history", async (c) => c.json(await history(c.env.DB)))
   .post(
     "/api/staff/commands",
     validator("json", (value, c) => {

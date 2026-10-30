@@ -4,7 +4,6 @@ import { Miniflare } from "miniflare";
 import { readFile, readdir } from "node:fs/promises";
 import {
   zeroCounts,
-  japanDate,
   type Command,
   type CommandResult,
   type State,
@@ -12,7 +11,6 @@ import {
 import { execute, history, loadState } from "../src/server/store";
 
 let mf: Miniflare;
-const today = japanDate();
 const token = crypto.randomUUID();
 async function request(path: string, body?: unknown, authenticated = true) {
   return mf.dispatchFetch(`http://localhost${path}`, {
@@ -53,6 +51,36 @@ beforeAll(async () => {
   });
   const db = await mf.getD1Database("DB");
   for (const file of (await readdir("migrations")).sort()) {
+    if (file === "0006_continuous_orders.sql") {
+      await db.batch([
+        db.prepare(
+          "INSERT INTO days (id, last_number, next_sequence) VALUES ('2026-10-25', 7, 2)",
+        ),
+        db
+          .prepare(
+            "INSERT INTO inventory (day, counts) VALUES ('2026-10-25', ?)",
+          )
+          .bind(JSON.stringify({ ...zeroCounts(), tsubuan: 4 })),
+        db
+          .prepare(
+            "INSERT INTO orders (id, day, sequence, number, status, items, allocated, created_at) VALUES (?, '2026-10-25', 1, 7, 'waiting', ?, ?, '2026-10-25T00:00:00Z')",
+          )
+          .bind(
+            crypto.randomUUID(),
+            JSON.stringify({ ...zeroCounts(), tsubuan: 1 }),
+            JSON.stringify(zeroCounts()),
+          ),
+        db
+          .prepare(
+            "INSERT INTO operations (id, request, response, revision) VALUES (?, '{}', '{}', 1)",
+          )
+          .bind(crypto.randomUUID()),
+        db.prepare("UPDATE app_state SET revision = 1 WHERE id = 1"),
+        db.prepare(
+          "UPDATE flavors SET cooking_minutes = 12 WHERE id = 'imoan'",
+        ),
+      ]);
+    }
     const sql = await readFile(`migrations/${file}`, "utf8");
     await db.exec(sql.replace(/\n/g, " "));
   }
@@ -61,23 +89,44 @@ afterAll(async () => {
   await mf?.dispose();
 });
 
-it("runs concurrent operations atomically, deduplicates retries and preserves daily history", async () => {
+it("resets legacy orders, stock and numbering while preserving sales settings", async () => {
+  const db = await mf.getD1Database("DB");
+  expect(await loadState(db)).toMatchObject({
+    revision: 0,
+    lastNumber: 99,
+    orders: [],
+    stock: zeroCounts(),
+    flavors: expect.arrayContaining([
+      { id: "imoan", enabled: false, cookingMinutes: 12, perBatch: 2 },
+    ]),
+  });
+  expect(
+    await db.prepare("SELECT COUNT(*) AS count FROM operations").first("count"),
+  ).toBe(0);
+  expect(
+    await db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name IN ('days', 'inventory')",
+      )
+      .first("count"),
+  ).toBe(0);
+});
+
+it("runs concurrent operations atomically, deduplicates retries and preserves history", async () => {
   expect((await request("/api/staff/state", undefined, false)).status).toBe(
     401,
   );
   const status = await request("/api/status", undefined, false);
   expect(status.status).toBe(200);
-  expect(await status.json()).toMatchObject({ day: today, orders: [] });
+  expect(await status.json()).toMatchObject({ orders: [] });
   const first = (
     await command({
       type: "order",
-      day: today,
       items: { ...zeroCounts(), tsubuan: 1, custard: 1 },
     })
   ).order!;
   const production: Command = {
     type: "production",
-    day: today,
     items: { ...zeroCounts(), tsubuan: 2 },
   };
   const operationId = crypto.randomUUID();
@@ -88,12 +137,11 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   const second = (
     await command({
       type: "order",
-      day: today,
       items: { ...zeroCounts(), tsubuan: 1 },
     })
   ).order!;
   expect(second.status).toBe("ready");
-  const skip: Command = { type: "skip", day: today, orderId: first.id };
+  const skip: Command = { type: "skip", orderId: first.id };
   const skipId = crypto.randomUUID();
   await Promise.all([command(skip, skipId), command(skip, skipId)]);
   const skipped = (await (await request("/api/staff/state")).json()) as State;
@@ -106,19 +154,18 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   expect(
     await (await request(`/api/orders/${first.id}`, undefined, false)).json(),
   ).toMatchObject({
-    order: { id: first.id, number: 1, status: "ready" },
+    order: { id: first.id, number: 100, status: "ready" },
   });
   expect(
     await (await request("/api/status", undefined, false)).json(),
   ).toMatchObject({
     orders: expect.arrayContaining([
-      { id: first.id, number: 1, status: "ready" },
+      { id: first.id, number: 100, status: "ready" },
     ]),
   });
-  await command({ type: "resume", day: today, orderId: first.id });
+  await command({ type: "resume", orderId: first.id });
   const restored = (await (await request("/api/staff/state")).json()) as State;
   expect(restored.orders.find(({ id }) => id === first.id)).toMatchObject({
-    sequence: first.sequence,
     status: "waiting",
   });
   expect(restored.orders.find(({ id }) => id === second.id)!.status).toBe(
@@ -138,7 +185,6 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     Array.from({ length: 4 }, () =>
       command({
         type: "order",
-        day: today,
         items: { ...zeroCounts(), custard: 1 },
       }),
     ),
@@ -148,24 +194,24 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     (
       await request("/api/staff/commands", {
         operationId: crypto.randomUUID(),
-        command: { type: "complete", day: today, orderId: first.id },
+        command: { type: "complete", orderId: first.id },
       })
     ).status,
   ).toBe(409);
-  await command({ type: "complete", day: today, orderId: second.id });
+  await command({ type: "complete", orderId: second.id });
   const db = await mf.getD1Database("DB");
   await expect(
     db
-      .prepare("UPDATE days SET last_number = 100 WHERE id = ?")
-      .bind(today)
+      .prepare("UPDATE orders SET number = 0 WHERE id = ?")
+      .bind(second.id)
       .run(),
   ).rejects.toThrow("CHECK");
   await expect(
     db
-      .prepare("UPDATE orders SET number = 100 WHERE id = ?")
-      .bind(second.id)
+      .prepare("UPDATE orders SET number = ? WHERE id = ?")
+      .bind(first.number, second.id)
       .run(),
-  ).rejects.toThrow("CHECK");
+  ).rejects.toThrow("UNIQUE");
   const snapshot = (await (await request("/api/staff/state")).json()) as State;
   expect(snapshot.stock.tsubuan).toBe(0);
   expect(
@@ -174,15 +220,14 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   const oldOrder = (await (
     await request(`/api/orders/${second.id}`, undefined, false)
   ).json()) as {
-    order: { status: string; day: string };
+    order: { status: string };
   };
   expect(oldOrder.order.status).toBe("completed");
-  expect(oldOrder.order.day).toBe(today);
   expect(oldOrder.order).not.toHaveProperty("allocated");
   expect(oldOrder.order).not.toHaveProperty("sequence");
   expect(oldOrder.order).not.toHaveProperty("createdAt");
   expect(
-    (await (await request(`/api/staff/history/${today}`)).json()) as unknown[],
+    (await (await request("/api/staff/history")).json()) as unknown[],
   ).toHaveLength(6);
   await command({
     type: "flavor",
@@ -192,7 +237,6 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   const nextPriority = concurrent[0]!.order!;
   const prioritize: Command = {
     type: "prioritize",
-    day: today,
     orderId: priority.id,
   };
   const priorityOperationId = crypto.randomUUID();
@@ -201,7 +245,7 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     command(prioritize, priorityOperationId),
   ]);
   expect(duplicate).toEqual(designated);
-  await command({ type: "prioritize", day: today, orderId: nextPriority.id });
+  await command({ type: "prioritize", orderId: nextPriority.id });
   await command(prioritize);
   const prioritized = (await (
     await request("/api/staff/state")
@@ -216,7 +260,7 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     prioritized.orders.find(({ id }) => id === nextPriority.id)!
       .prioritySequence!,
   );
-  expect(await history(db, today)).toContainEqual(currentPriority);
+  expect(await history(db)).toContainEqual(currentPriority);
   const publicPriority = (await (
     await request(`/api/orders/${priority.id}`, undefined, false)
   ).json()) as {
@@ -231,7 +275,6 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   ).toMatchObject({ waitMinutes: 30 });
   await command({
     type: "production",
-    day: today,
     items: { ...zeroCounts(), custard: 1 },
   });
   const ready = (await (await request("/api/staff/state")).json()) as State;
@@ -245,7 +288,6 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
     operationId: crypto.randomUUID(),
     command: {
       type: "adjust",
-      day: today,
       items: { ...zeroCounts(), tsubuan: 1, custard: -1 },
     },
   });
@@ -256,7 +298,7 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
       (
         await request("/api/staff/commands", {
           operationId: crypto.randomUUID(),
-          command: { type, day: today, orderId: priority.id },
+          command: { type, orderId: priority.id },
         })
       ).status,
     ).toBe(409);
@@ -267,7 +309,7 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
       .bind(priority.id)
       .run(),
   ).rejects.toThrow("CHECK");
-  await command({ type: "prioritize", day: today, orderId: first.id });
+  await command({ type: "prioritize", orderId: first.id });
   const finalState = await loadState(db);
   expect(finalState.orders.find(({ id }) => id === priority.id)).toMatchObject({
     status: "ready",
@@ -275,56 +317,38 @@ it("runs concurrent operations atomically, deduplicates retries and preserves da
   });
 }, 30000);
 
-it("switches at midnight in Japan while retaining history, settings and retry results", async () => {
+it("retains orders, stock, priorities, numbering and retry results across midnight", async () => {
   const db = await mf.getD1Database("DB");
+  await db.prepare("UPDATE app_state SET last_number = 998 WHERE id = 1").run();
   const beforeMidnight = new Date("2040-05-01T14:59:59.999Z");
   const midnight = new Date("2040-05-01T15:00:00.000Z");
   const operationId = crypto.randomUUID();
   const request: Command = {
     type: "order",
-    day: "2040-05-01",
     items: { ...zeroCounts(), tsubuan: 1, custard: 1 },
   };
   const first = await execute(db, operationId, request, beforeMidnight);
+  expect(first.order!.number).toBe(999);
   await execute(
     db,
     crypto.randomUUID(),
-    {
-      type: "production",
-      day: request.day,
-      items: { ...zeroCounts(), tsubuan: 3 },
-    },
+    { type: "prioritize", orderId: first.order!.id },
     beforeMidnight,
   );
-  const previous = await loadState(db, beforeMidnight);
   await execute(
     db,
     crypto.randomUUID(),
-    {
-      type: "flavor",
-      flavor: { ...previous.flavors[0]!, cookingMinutes: 12, perBatch: 8 },
-    },
+    { type: "production", items: { ...zeroCounts(), tsubuan: 20 } },
     beforeMidnight,
   );
-  const next = await loadState(db, midnight);
-  expect(next.day).toEqual({
-    id: "2040-05-02",
-    lastNumber: 0,
-    nextSequence: 1,
-  });
-  expect(next.stock).toEqual(zeroCounts());
-  expect(next.orders).toEqual([]);
-  expect(next.flavors[0]).toMatchObject({ cookingMinutes: 12, perBatch: 8 });
-  expect((await history(db, request.day))[0]).toMatchObject({
-    id: first.order!.id,
+  const previous = await loadState(db);
+  expect(
+    previous.orders.find(({ id }) => id === first.order!.id),
+  ).toMatchObject({
     status: "waiting",
     allocated: { tsubuan: 1, custard: 0 },
+    prioritySequence: expect.any(Number),
   });
-  expect((await loadState(db, beforeMidnight)).stock.tsubuan).toBe(2);
-  expect(await execute(db, operationId, request, midnight)).toEqual(first);
-  await expect(
-    execute(db, crypto.randomUUID(), request, midnight),
-  ).rejects.toThrow("営業日");
   const orders = await Promise.all(
     Array.from({ length: 2 }, () =>
       execute(
@@ -332,7 +356,6 @@ it("switches at midnight in Japan while retaining history, settings and retry re
         crypto.randomUUID(),
         {
           type: "order",
-          day: "2040-05-02",
           items: { ...zeroCounts(), tsubuan: 1 },
         },
         midnight,
@@ -341,7 +364,22 @@ it("switches at midnight in Japan while retaining history, settings and retry re
   );
   expect(
     orders.map(({ order }) => order!.number).sort((a, b) => a - b),
-  ).toEqual([1, 2]);
-  expect((await loadState(db, midnight)).orders).toHaveLength(2);
-  expect(await history(db, request.day)).toHaveLength(1);
+  ).toEqual([1000, 1001]);
+  const next = await loadState(db);
+  expect(next.lastNumber).toBe(1001);
+  expect(next.stock.tsubuan).toBe(previous.stock.tsubuan - 2);
+  expect(next.flavors).toEqual(previous.flavors);
+  expect(next.orders.find(({ id }) => id === first.order!.id)).toEqual(
+    previous.orders.find(({ id }) => id === first.order!.id),
+  );
+  expect(await execute(db, operationId, request, midnight)).toEqual(first);
+  const all = await history(db);
+  expect(all).toHaveLength(9);
+  expect(all.map(({ number }) => number)).toEqual([
+    1001, 1000, 999, 105, 104, 103, 102, 101, 100,
+  ]);
+  expect(all.find(({ id }) => id === first.order!.id)?.createdAt).toBe(
+    beforeMidnight.toISOString(),
+  );
+  expect(all[0]?.createdAt).toBe(midnight.toISOString());
 });

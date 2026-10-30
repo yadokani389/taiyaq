@@ -28,3 +28,7 @@ pnpm test:e2e
 pnpm db:migrate:remote
 pnpm run deploy
 ```
+
+`0006_continuous_orders.sql`は、日付による管理を廃止する際に既存の注文と在庫、操作履歴をリセットします。
+次の整理券番号は100になり、味ごとの販売設定は保持します。
+適用前に必要なデータを退避してください。

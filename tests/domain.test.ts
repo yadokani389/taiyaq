@@ -15,7 +15,7 @@ import { commandSchema } from "../src/validation";
 function state(): State {
   return {
     revision: 0,
-    day: { id: "2026-10-25", lastNumber: 0, nextSequence: 1 },
+    lastNumber: 99,
     stock: zeroCounts(),
     orders: [],
     flavors: FLAVORS.map(({ id }) => ({
@@ -33,7 +33,7 @@ const counts = (values: Partial<Counts>): Counts => ({
 const run = (s: State, c: Command) =>
   applyCommand(s, c, "2026-10-25T01:00:00Z", crypto.randomUUID());
 const order = (s: State, items: Partial<Counts>) =>
-  run(s, { type: "order", day: s.day.id, items: counts(items) }).order!;
+  run(s, { type: "order", items: counts(items) }).order!;
 
 describe("order allocation", () => {
   it("reserves each flavor in arrival order while allowing independent flavors through", () => {
@@ -43,7 +43,6 @@ describe("order allocation", () => {
     const third = order(s, { kurikinton: 1 });
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1, kurikinton: 1 }),
     });
     expect(first.allocated.tsubuan).toBe(1);
@@ -51,44 +50,39 @@ describe("order allocation", () => {
     expect(third.status).toBe("ready");
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 2 }),
     });
     expect(first.allocated.tsubuan).toBe(2);
     expect(first.status).toBe("waiting");
     expect(second.status).toBe("ready");
-    run(s, { type: "cancel", day: s.day.id, orderId: first.id });
+    run(s, { type: "cancel", orderId: first.id });
     expect(s.stock.tsubuan).toBe(2);
     expect(second.status).toBe("ready");
   });
   it("corrects waiting inventory without taking ready or delivered items", () => {
     const s = state();
     const first = order(s, { tsubuan: 1 });
-    expect(() =>
-      run(s, { type: "complete", day: s.day.id, orderId: first.id }),
-    ).toThrow("全品");
+    expect(() => run(s, { type: "complete", orderId: first.id })).toThrow(
+      "全品",
+    );
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 2 }),
     });
-    run(s, { type: "complete", day: s.day.id, orderId: first.id });
-    expect(() =>
-      run(s, { type: "cancel", day: s.day.id, orderId: first.id }),
-    ).toThrow("終了");
+    run(s, { type: "complete", orderId: first.id });
+    expect(() => run(s, { type: "cancel", orderId: first.id })).toThrow("終了");
     const second = order(s, { tsubuan: 1 });
     const before = structuredClone(s);
     expect(() =>
-      run(s, { type: "adjust", day: s.day.id, items: counts({ tsubuan: -1 }) }),
+      run(s, { type: "adjust", items: counts({ tsubuan: -1 }) }),
     ).toThrow("受け取り可能");
     expect(s).toEqual(before);
     const third = order(s, { tsubuan: 2 });
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
-    run(s, { type: "adjust", day: s.day.id, items: counts({ tsubuan: -1 }) });
+    run(s, { type: "adjust", items: counts({ tsubuan: -1 }) });
     expect(second.status).toBe("ready");
     expect(second.allocated.tsubuan).toBe(1);
     expect(third.status).toBe("waiting");
@@ -96,7 +90,6 @@ describe("order allocation", () => {
     expect(() =>
       run(s, {
         type: "adjust",
-        day: s.day.id,
         items: counts({ tsubuan: -1 }),
       }),
     ).toThrow("受け渡し済み");
@@ -106,27 +99,23 @@ describe("order allocation", () => {
     const first = order(s, { tsubuan: 2, custard: 1 });
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     const priority = order(s, { tsubuan: 1 });
-    run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+    run(s, { type: "prioritize", orderId: priority.id });
     expect(first.allocated.tsubuan).toBe(0);
     expect(priority).toMatchObject({
       status: "ready",
       prioritySequence: null,
-      sequence: 2,
-      number: 2,
+      number: 101,
       allocated: { tsubuan: 1 },
     });
-    run(s, { type: "prioritize", day: s.day.id, orderId: first.id });
+    run(s, { type: "prioritize", orderId: first.id });
     expect(first.status).toBe("waiting");
     expect(priority.status).toBe("ready");
     expect(priority.allocated.tsubuan).toBe(1);
     for (const type of ["prioritize", "unprioritize"] as const) {
-      expect(() =>
-        run(s, { type, day: s.day.id, orderId: priority.id }),
-      ).toThrow("準備中");
+      expect(() => run(s, { type, orderId: priority.id })).toThrow("準備中");
     }
   });
   it("keeps priority in designation order across batches and sends re-designations to the back", () => {
@@ -134,17 +123,16 @@ describe("order allocation", () => {
     const regular = order(s, { tsubuan: 3 });
     const first = order(s, { tsubuan: 2, custard: 1 });
     const second = order(s, { tsubuan: 2 });
-    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
-    run(s, { type: "prioritize", day: s.day.id, orderId: first.id });
+    run(s, { type: "prioritize", orderId: second.id });
+    run(s, { type: "prioritize", orderId: first.id });
     const originalPriority = second.prioritySequence;
-    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    run(s, { type: "prioritize", orderId: second.id });
     expect(second.prioritySequence).toBe(originalPriority);
-    run(s, { type: "unprioritize", day: s.day.id, orderId: second.id });
-    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    run(s, { type: "unprioritize", orderId: second.id });
+    run(s, { type: "prioritize", orderId: second.id });
     expect(first.prioritySequence!).toBeLessThan(second.prioritySequence!);
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 2 }),
     });
     expect(first.allocated.tsubuan).toBe(2);
@@ -153,7 +141,6 @@ describe("order allocation", () => {
     const independent = order(s, { kurikinton: 1 });
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ kurikinton: 1, custard: 1 }),
     });
     expect(independent.status).toBe("ready");
@@ -161,7 +148,6 @@ describe("order allocation", () => {
     expect(first.prioritySequence).toBeNull();
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(second.status).toBe("waiting");
@@ -169,7 +155,6 @@ describe("order allocation", () => {
     expect(second.prioritySequence).not.toBeNull();
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(second.status).toBe("ready");
@@ -180,14 +165,13 @@ describe("order allocation", () => {
     const s = state();
     const regular = order(s, { tsubuan: 2 });
     const priority = order(s, { tsubuan: 2 });
-    run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+    run(s, { type: "prioritize", orderId: priority.id });
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(priority.allocated.tsubuan).toBe(1);
-    run(s, { type: "unprioritize", day: s.day.id, orderId: priority.id });
+    run(s, { type: "unprioritize", orderId: priority.id });
     expect(priority.prioritySequence).toBeNull();
     expect(priority.allocated.tsubuan).toBe(0);
     expect(regular.allocated.tsubuan).toBe(1);
@@ -198,21 +182,20 @@ describe("order allocation", () => {
       const s = state();
       const regular = order(s, { tsubuan: 1 });
       const priority = order(s, { tsubuan: 2 });
-      run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+      run(s, { type: "prioritize", orderId: priority.id });
       run(s, {
         type: "production",
-        day: s.day.id,
         items: counts({ tsubuan: 1 }),
       });
-      run(s, { type, day: s.day.id, orderId: priority.id });
+      run(s, { type, orderId: priority.id });
       expect(priority.prioritySequence).toBeNull();
       expect(priority.allocated).toEqual(zeroCounts());
       expect(regular.status).toBe("ready");
       expect(() =>
-        run(s, { type: "prioritize", day: s.day.id, orderId: priority.id }),
+        run(s, { type: "prioritize", orderId: priority.id }),
       ).toThrow();
       if (type === "skip") {
-        run(s, { type: "resume", day: s.day.id, orderId: priority.id });
+        run(s, { type: "resume", orderId: priority.id });
         expect(priority.prioritySequence).toBeNull();
         expect(priority.status).toBe("waiting");
         expect(regular.status).toBe("ready");
@@ -224,13 +207,12 @@ describe("order allocation", () => {
     s.flavors[0]!.perBatch = 1;
     const regular = order(s, { tsubuan: 2 });
     const priority = order(s, { tsubuan: 1 });
-    run(s, { type: "prioritize", day: s.day.id, orderId: priority.id });
+    run(s, { type: "prioritize", orderId: priority.id });
     expect(estimateWait(s, "tsubuan", priority)).toBe(15);
     expect(estimateWait(s, "tsubuan", regular)).toBe(45);
     expect(estimateWait(s, "tsubuan")).toBe(60);
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(estimateWait(s, "tsubuan", regular)).toBe(30);
@@ -262,26 +244,21 @@ describe("order allocation", () => {
     expect(estimateOrderWait(s, second)).toBe(10);
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ custard: 1 }),
     });
     expect(estimateOrderWait(s, first)).toBe(5);
-    run(s, { type: "prioritize", day: s.day.id, orderId: second.id });
+    run(s, { type: "prioritize", orderId: second.id });
     expect(estimateOrderWait(s, first)).toBe(10);
     expect(estimateOrderWait(s, second)).toBe(0);
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(second.status).toBe("ready");
     expect(estimateOrderWait(s, second)).toBe(0);
     expect(estimateOrderWait(s, first)).toBe(5);
-    run(s, { type: "skip", day: s.day.id, orderId: first.id });
+    run(s, { type: "skip", orderId: first.id });
     expect(estimateOrderWait(s, first)).toBe(0);
-    expect(
-      estimateOrderWait(s, { ...first, status: "waiting", day: "2026-10-24" }),
-    ).toBe(0);
   });
   it("estimates one more item after waiting demand and reserved stock", () => {
     const s = state();
@@ -290,29 +267,25 @@ describe("order allocation", () => {
     expect(estimateWait(s, "tsubuan")).toBe(30);
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 10 }),
     });
     expect(waiting.status).toBe("waiting");
     expect(estimateWait(s, "tsubuan")).toBe(15);
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(estimateWait(s, "tsubuan")).toBe(0);
   });
-  it("cycles tickets, skips occupied numbers and refuses a full pool", () => {
+  it("starts at 100 and continues past 999 without reusing cancelled tickets", () => {
     const s = state();
-    for (let n = 1; n <= 99; n++)
-      expect(order(s, { tsubuan: 1 }).number).toBe(n);
-    expect(s.day.lastNumber).toBe(99);
-    expect(() => order(s, { tsubuan: 1 })).toThrow("空き");
-    run(s, { type: "cancel", day: s.day.id, orderId: s.orders[0]!.id });
-    expect(order(s, { custard: 1 }).number).toBe(1);
-    run(s, { type: "cancel", day: s.day.id, orderId: s.orders[41]!.id });
-    expect(order(s, { custard: 1 }).number).toBe(42);
-    expect(s.orders[0]!.number).toBe(1);
+    const first = order(s, { tsubuan: 1 });
+    expect(first.number).toBe(100);
+    run(s, { type: "cancel", orderId: first.id });
+    for (let number = 101; number <= 1001; number++)
+      expect(order(s, { tsubuan: 1 }).number).toBe(number);
+    expect(s.lastNumber).toBe(1001);
+    expect(first.number).toBe(100);
   });
   it("releases skipped orders and restores their original priority without taking ready items", () => {
     const s = state();
@@ -320,43 +293,37 @@ describe("order allocation", () => {
     const second = order(s, { tsubuan: 1 });
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 2 }),
     });
     expect(absent.status).toBe("ready");
-    run(s, { type: "skip", day: s.day.id, orderId: absent.id });
+    run(s, { type: "skip", orderId: absent.id });
     expect(absent.status).toBe("skipped");
     expect(absent.allocated).toEqual(zeroCounts());
     expect(absent.finishedAt).toBeNull();
     expect(second.status).toBe("ready");
     expect(s.stock.tsubuan).toBe(1);
-    expect(() =>
-      run(s, { type: "skip", day: s.day.id, orderId: absent.id }),
-    ).toThrow("保留");
-    expect(() =>
-      run(s, { type: "complete", day: s.day.id, orderId: absent.id }),
-    ).toThrow("保留");
-    s.day.lastNumber = 99;
+    expect(() => run(s, { type: "skip", orderId: absent.id })).toThrow("保留");
+    expect(() => run(s, { type: "complete", orderId: absent.id })).toThrow(
+      "保留",
+    );
     const third = order(s, { tsubuan: 1 });
-    expect(third.number).toBe(3);
+    expect(third.number).toBe(102);
     expect(third.status).toBe("ready");
     const fourth = order(s, { tsubuan: 1 });
-    run(s, { type: "resume", day: s.day.id, orderId: absent.id });
-    run(s, { type: "adjust", day: s.day.id, items: counts({ custard: 1 }) });
-    run(s, { type: "adjust", day: s.day.id, items: counts({ custard: -1 }) });
-    expect(absent.sequence).toBe(1);
-    expect(absent.number).toBe(1);
+    run(s, { type: "resume", orderId: absent.id });
+    run(s, { type: "adjust", items: counts({ custard: 1 }) });
+    run(s, { type: "adjust", items: counts({ custard: -1 }) });
+    expect(absent.number).toBe(100);
     expect(absent.status).toBe("waiting");
     expect(second.status).toBe("ready");
     expect(second.allocated.tsubuan).toBe(1);
     expect(third.status).toBe("ready");
     expect(third.allocated.tsubuan).toBe(1);
-    expect(() =>
-      run(s, { type: "resume", day: s.day.id, orderId: absent.id }),
-    ).toThrow("保留");
+    expect(() => run(s, { type: "resume", orderId: absent.id })).toThrow(
+      "保留",
+    );
     run(s, {
       type: "adjust",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(absent.allocated.tsubuan).toBe(1);
@@ -366,47 +333,38 @@ describe("order allocation", () => {
     expect(third.status).toBe("ready");
     run(s, {
       type: "production",
-      day: s.day.id,
       items: counts({ tsubuan: 1 }),
     });
     expect(absent.status).toBe("ready");
     expect(fourth.status).toBe("waiting");
-    run(s, { type: "skip", day: s.day.id, orderId: second.id });
+    run(s, { type: "skip", orderId: second.id });
     expect(fourth.status).toBe("ready");
-    run(s, { type: "cancel", day: s.day.id, orderId: second.id });
+    run(s, { type: "cancel", orderId: second.id });
     expect(second.status).toBe("cancelled");
     expect(second.finishedAt).not.toBeNull();
     expect(s.stock.tsubuan).toBe(0);
   });
-  it("keeps accepted orders when a flavor is stopped and rejects stale dates", () => {
+  it("keeps accepted orders when a flavor is stopped", () => {
     const s = state();
     const existing = order(s, { imoan: 1 });
     run(s, { type: "flavor", flavor: { ...s.flavors[3]!, enabled: false } });
     expect(() => order(s, { imoan: 1 })).toThrow("停止");
-    run(s, { type: "production", day: s.day.id, items: counts({ imoan: 1 }) });
+    run(s, { type: "production", items: counts({ imoan: 1 }) });
     expect(existing.status).toBe("ready");
-    expect(() =>
-      run(s, {
-        type: "production",
-        day: "2026-10-24",
-        items: counts({ tsubuan: 1 }),
-      }),
-    ).toThrow("営業日");
   });
 });
 
 it("validates empty, fractional, unknown and out-of-range input at the API boundary", () => {
   for (const value of [
     null,
-    { type: "order", day: "2026-02-30", items: { tsubuan: 1 } },
-    { type: "order", day: "2026-99-99", items: { tsubuan: 1 } },
-    { type: "order", day: "2026-10-25", items: {} },
-    { type: "order", day: "2026-10-25", items: { tsubuan: -1 } },
-    { type: "order", day: "2026-10-25", items: { tsubuan: 1.5 } },
-    { type: "order", day: "2026-10-25", items: { tsubuan: 101 } },
-    { type: "order", day: "2026-10-25", items: { other: 1 } },
-    { type: "prioritize", day: "2026-10-25", orderId: "invalid" },
-    { type: "unprioritize", day: "2026-02-30", orderId: crypto.randomUUID() },
+    { type: "order", day: "2026-10-25", items: { tsubuan: 1 } },
+    { type: "order", items: {} },
+    { type: "order", items: { tsubuan: -1 } },
+    { type: "order", items: { tsubuan: 1.5 } },
+    { type: "order", items: { tsubuan: 101 } },
+    { type: "order", items: { other: 1 } },
+    { type: "prioritize", orderId: "invalid" },
+    { type: "unprioritize", orderId: "invalid" },
     {
       type: "flavor",
       flavor: { id: "tsubuan", enabled: true, cookingMinutes: 0, perBatch: 10 },
@@ -416,12 +374,10 @@ it("validates empty, fractional, unknown and out-of-range input at the API bound
   expect(
     v.parse(commandSchema, {
       type: "order",
-      day: "2026-10-25",
       items: { imoan: 2 },
     }),
   ).toEqual({
     type: "order",
-    day: "2026-10-25",
     items: counts({ imoan: 2 }),
   });
 });

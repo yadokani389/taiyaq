@@ -1,6 +1,5 @@
 import {
   FLAVORS,
-  MAX_TICKET_NUMBER,
   zeroCounts,
   compareAllocationOrder,
   type Command,
@@ -51,34 +50,14 @@ export function applyCommand(
     state.flavors[index] = command.flavor;
     return {};
   }
-  if (state.day.id !== command.day) {
-    throw new UserError("営業日が変わっています。画面を更新してください", 409);
-  }
   if (command.type === "order") {
     for (const { id, enabled } of state.flavors) {
       if (!enabled && command.items[id] > 0)
         throw new UserError("受付を停止している味が含まれています", 409);
     }
-    const occupied = new Set(
-      state.orders
-        .filter(
-          ({ status }) =>
-            status === "waiting" || status === "ready" || status === "skipped",
-        )
-        .map(({ number }) => number),
-    );
-    let number = state.day.lastNumber;
-    for (let attempts = 0; attempts < MAX_TICKET_NUMBER; attempts++) {
-      number = (number % MAX_TICKET_NUMBER) + 1;
-      if (!occupied.has(number)) break;
-    }
-    if (occupied.has(number))
-      throw new UserError("整理券番号に空きがありません", 409);
     const order = {
       id: newId,
-      day: state.day.id,
-      sequence: state.day.nextSequence++,
-      number,
+      number: ++state.lastNumber,
       status: "waiting" as const,
       prioritySequence: null,
       items: command.items,
@@ -86,7 +65,6 @@ export function applyCommand(
       createdAt: now,
       finishedAt: null,
     };
-    state.day.lastNumber = number;
     state.orders.push(order);
     allocate(state);
     return { order };

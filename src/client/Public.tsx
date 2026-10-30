@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   FLAVORS,
-  MAX_TICKET_NUMBER,
   STATUS_LABELS,
   type PublicOrder,
   type PublicState,
@@ -95,8 +94,6 @@ export function Public({ display = false }: { display?: boolean }) {
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={MAX_TICKET_NUMBER}
-                    placeholder={`1〜${MAX_TICKET_NUMBER}`}
                     value={number}
                     onChange={(event) => setNumber(event.target.value)}
                     required
@@ -138,9 +135,6 @@ export function Public({ display = false }: { display?: boolean }) {
                         )
                         .join("、")}
                     </p>
-                    {detail.data.order.day !== data.day ? (
-                      <small>{detail.data.order.day}の注文</small>
-                    ) : null}
                   </div>
                 </article>
               ) : null}

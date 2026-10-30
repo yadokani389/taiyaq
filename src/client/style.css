@@ -520,12 +520,6 @@ button[aria-pressed="true"]:hover:enabled {
   margin-top: 10px;
   width: 100%;
 }
-.day-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 20px;
-}
 .history-row {
   padding: 14px 0;
   border-bottom: 1px solid var(--line);
@@ -640,6 +634,7 @@ button[aria-pressed="true"]:hover:enabled {
 .number-grid button,
 .number-grid > span {
   text-align: center;
+  overflow-wrap: anywhere;
   padding: 9px 6px;
   font-size: 38px;
   font-weight: 700;
@@ -852,7 +847,7 @@ button[aria-pressed="true"]:hover:enabled {
   }
   .order-row {
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
   }
   .order-actions {
     grid-column: 2;
@@ -976,8 +971,12 @@ button[aria-pressed="true"]:hover:enabled {
   align-content: start;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }
-.display-page .ready-numbers .number-grid > span {
+.display-page .ready-numbers .number-grid {
   font-size: clamp(64px, 9vw, 130px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 5ch), 1fr));
+}
+.display-page .ready-numbers .number-grid > span {
+  font-size: inherit;
 }
 @media (max-width: 400px) {
   .quantity-picker.production .presets {

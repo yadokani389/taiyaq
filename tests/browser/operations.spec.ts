@@ -39,13 +39,13 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("1");
   await page.keyboard.press("Enter");
-  await expect(page.locator(".notice")).toContainText("1番で受け付けました");
+  await expect(page.locator(".notice")).toContainText("100番で受け付けました");
   await expect(page.locator(".order-row .order-wait")).toHaveText(
     "そろそろできます",
   );
   await page.keyboard.press("1");
   await page.keyboard.press("NumpadEnter");
-  await expect(page.locator(".notice")).toContainText("2番で受け付けました");
+  await expect(page.locator(".notice")).toContainText("101番で受け付けました");
   await page.getByRole("button", { name: /販売設定/ }).click();
   await page
     .locator(".flavor-setting")
@@ -63,7 +63,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     .getByRole("button", { name: "栗きんとん 1個", exact: true })
     .click();
   await page.getByRole("button", { name: /注文を登録/ }).click();
-  await expect(page.locator(".notice")).toContainText("3番で受け付けました");
+  await expect(page.locator(".notice")).toContainText("102番で受け付けました");
   await page
     .getByRole("button", { name: /焼き上がり/ })
     .first()
@@ -106,10 +106,13 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.screenshot({ path: "/tmp/taiyaq-staff.png", fullPage: true });
   const search = page.getByRole("textbox", { name: "整理券番号で検索" });
   const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
+  await search.fill("1000");
+  await expect(search).toHaveValue("1000");
+  await search.press("Escape");
   await page.keyboard.press("/");
-  await page.keyboard.type("3");
+  await page.keyboard.type("102");
   await page.keyboard.press(".");
-  await expect(page.locator(".order-row.skipped")).toContainText("03");
+  await expect(page.locator(".order-row.skipped")).toContainText("102");
   await expect(page.locator(".order-row.skipped .order-wait")).toHaveCount(0);
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
@@ -123,14 +126,15 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   });
   await publicPage.goto("/");
   const ticket = publicPage.getByLabel("整理券番号で確認", { exact: true });
-  await ticket.fill("100");
+  await ticket.fill("1000");
   await publicPage.getByRole("button", { name: "確認", exact: true }).click();
   expect(
     await ticket.evaluate(
       (input: HTMLInputElement) => input.validity.rangeOverflow,
     ),
-  ).toBe(true);
-  await ticket.fill("3");
+  ).toBe(false);
+  await expect(publicPage.getByRole("alert")).toContainText("見つかりません");
+  await ticket.fill("102");
   await publicPage.getByRole("button", { name: "確認", exact: true }).click();
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "受け取り可能",
@@ -138,21 +142,21 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   const display = await context.newPage();
   await display.goto("/display");
   await expect(display.locator(".ready-numbers .number-grid")).toContainText(
-    "03",
+    "102",
   );
   await display.screenshot({
     path: "/tmp/taiyaq-held-display.png",
     fullPage: true,
   });
   await page.bringToFront();
-  await page.keyboard.type("3");
+  await page.keyboard.type("102");
   await expect(
     page.getByRole("button", { name: "列に戻す ↵", exact: true }),
   ).toBeEnabled();
   await page.keyboard.press("Enter");
-  await expect(page.locator(".notice")).toContainText("3番を列に戻しました");
+  await expect(page.locator(".notice")).toContainText("102番を列に戻しました");
   await expect(receive).toBeEnabled();
-  await expect(search).toHaveValue("3");
+  await expect(search).toHaveValue("102");
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -180,26 +184,26 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     ),
   ).toBe(true);
   await expect(display.locator(".ready-numbers .number-grid")).toContainText(
-    "03",
+    "102",
   );
   await display.screenshot({ path: "/tmp/taiyaq-display.png", fullPage: true });
   await page.bringToFront();
   await page.keyboard.press("/");
-  await page.keyboard.type("1");
+  await page.keyboard.type("100");
   await expect(receive).toBeDisabled();
   await page.keyboard.press("Enter");
-  await expect(search).toHaveValue("1");
+  await expect(search).toHaveValue("100");
   await page.keyboard.press("Escape");
   await expect(search).not.toBeFocused();
   await page.keyboard.press("/");
-  await page.keyboard.type("3");
+  await page.keyboard.type("102");
   await expect(receive).toBeEnabled();
   await page.screenshot({ path: "/tmp/taiyaq-receiving.png", fullPage: true });
   page.once("dialog", (dialog) => {
     void dialog.dismiss();
   });
   await page.keyboard.press("Enter");
-  await expect(search).toHaveValue("3");
+  await expect(search).toHaveValue("102");
   await page.keyboard.press("Tab");
   await expect(receive).toBeFocused();
   page.once("dialog", (dialog) => {
@@ -210,8 +214,8 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
   await expect(page.locator(".order-row")).toHaveCount(2);
-  await page.keyboard.type("1");
-  await expect(search).toHaveValue("1");
+  await page.keyboard.type("100");
+  await expect(search).toHaveValue("100");
   await expect(page.getByLabel("粒あんの数量", { exact: true })).toHaveText(
     "0",
   );
@@ -241,10 +245,10 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: /注文受付/ }).click();
   const firstOrder = page.locator(".order-row").filter({
-    has: page.locator(".ticket-number", { hasText: /^01$/ }),
+    has: page.locator(".ticket-number", { hasText: /^100$/ }),
   });
   const secondOrder = page.locator(".order-row").filter({
-    has: page.locator(".ticket-number", { hasText: /^02$/ }),
+    has: page.locator(".ticket-number", { hasText: /^101$/ }),
   });
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
@@ -254,7 +258,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     .getByRole("button", { name: "優先する", exact: true })
     .click();
   await expect(page.locator(".notice")).toContainText(
-    "2番が受け取り可能になりました",
+    "101番が受け取り可能になりました",
   );
   await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
   await expect(firstOrder).toContainText("確保 0");
@@ -264,8 +268,8 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(firstOrder.locator(".status-label")).toHaveText("優先待ち");
   await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
   await expect(page.locator(".order-list .ticket-number")).toHaveText([
-    "02",
-    "01",
+    "101",
+    "100",
   ]);
   await expect(page).toHaveURL(/\/staff$/);
   await expect(page).toHaveTitle(/taiyaq/);
@@ -285,7 +289,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     .screenshot({ path: "/tmp/taiyaq-priority-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.keyboard.press("/");
-  await page.keyboard.type("1");
+  await page.keyboard.type("100");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   const removePriority = firstOrder.getByRole("button", {
@@ -295,7 +299,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(removePriority).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator(".notice")).toContainText(
-    "1番の優先を解除しました",
+    "100番の優先を解除しました",
   );
   await expect(firstOrder.locator(".status-label")).toHaveText("準備中");
   await expect(search).toBeFocused();
@@ -312,7 +316,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(firstOrder.locator(".status-label")).toHaveText("優先待ち");
   await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
   await publicPage.goto("/");
-  await publicPage.getByLabel("整理券番号で確認", { exact: true }).fill("1");
+  await publicPage.getByLabel("整理券番号で確認", { exact: true }).fill("100");
   await publicPage.getByRole("button", { name: "確認", exact: true }).click();
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "準備中",
@@ -331,11 +335,11 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await publicPage.screenshot({ path: "/tmp/taiyaq-public-wait-soon.png" });
   await display.reload();
   await expect(display.locator(".ready-numbers .number-grid")).toContainText(
-    "02",
+    "101",
   );
   await expect(
     display.locator(".ready-numbers .number-grid"),
-  ).not.toContainText("01");
+  ).not.toContainText("100");
   await expect(firstOrder.locator(".order-wait")).toHaveText(
     "そろそろできます",
   );
@@ -345,13 +349,13 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press("9");
   await page.keyboard.press("ArrowRight");
   await page.getByRole("button", { name: /注文を登録/ }).click();
-  await expect(page.locator(".notice")).toContainText("4番で受け付けました");
+  await expect(page.locator(".notice")).toContainText("103番で受け付けました");
   const laterOrder = page.locator(".order-row").filter({
-    has: page.locator(".ticket-number", { hasText: /^04$/ }),
+    has: page.locator(".ticket-number", { hasText: /^103$/ }),
   });
   await expect(laterOrder.locator(".order-wait")).toHaveText("約15分後");
   await publicPage.reload();
-  await publicPage.getByLabel("整理券番号で確認", { exact: true }).fill("4");
+  await publicPage.getByLabel("整理券番号で確認", { exact: true }).fill("103");
   await publicPage.getByRole("button", { name: "確認", exact: true }).click();
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "約15分後",
@@ -390,6 +394,13 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(publicPage.locator(".your-order-detail")).toContainText(
     "そろそろできます",
   );
+  await page.getByRole("button", { name: /履歴/ }).click();
+  await expect(page.locator(".history-row")).toHaveCount(4);
+  await expect(page.locator(".day-list")).toHaveCount(0);
+  await page.screenshot({
+    path: "/tmp/taiyaq-continuous-history.png",
+    fullPage: true,
+  });
   expect(consoleErrors).toEqual([]);
   expect(errors).toEqual([]);
 });
