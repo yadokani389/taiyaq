@@ -41,31 +41,42 @@ export function QuantityPicker({
         return;
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat)
         return;
-      if (event.key === "Enter" && !target?.closest("button, a")) {
+      const key = production
+        ? (
+            {
+              w: "ArrowUp",
+              s: "ArrowDown",
+              a: "ArrowLeft",
+              d: "ArrowRight",
+              f: "Enter",
+            } as Record<string, string>
+          )[event.key.toLowerCase()]
+        : event.key;
+      if (!key) return;
+      if (key === "Enter" && (production || !target?.closest("button, a"))) {
         event.preventDefault();
         onSubmit();
         return;
       }
-      if (!/^(\d|ArrowDown|ArrowUp|ArrowRight|ArrowLeft)$/.test(event.key))
-        return;
+      if (!/^(\d|ArrowDown|ArrowUp|ArrowRight|ArrowLeft)$/.test(key)) return;
       event.preventDefault();
       target?.blur();
-      if (/^\d$/.test(event.key)) {
-        setQuantity(activeId, Number(event.key));
+      if (/^\d$/.test(key)) {
+        setQuantity(activeId, Number(key));
       }
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (key === "ArrowDown" || key === "ArrowUp") {
         const index = available.findIndex(({ id }) => id === activeId);
         setSelected(
           available[
-            (index + (event.key === "ArrowDown" ? 1 : available.length - 1)) %
+            (index + (key === "ArrowDown" ? 1 : available.length - 1)) %
               available.length
           ]!.id,
         );
       }
-      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      if (key === "ArrowRight" || key === "ArrowLeft") {
         setQuantity(
           activeId,
-          values[activeId] + (event.key === "ArrowRight" ? 1 : -1),
+          values[activeId] + (key === "ArrowRight" ? 1 : -1),
         );
       }
     }
@@ -125,9 +136,19 @@ export function QuantityPicker({
         </fieldset>
       ))}
       <p className="key-guide">
-        <kbd>↑</kbd>
-        <kbd>↓</kbd> 味　<kbd>0–9</kbd> 数量　<kbd>←</kbd>
-        <kbd>→</kbd> 増減
+        {production ? (
+          <>
+            <kbd>W</kbd>
+            <kbd>S</kbd> 味　<kbd>A</kbd>
+            <kbd>D</kbd> 増減　<kbd>F</kbd> 登録
+          </>
+        ) : (
+          <>
+            <kbd>↑</kbd>
+            <kbd>↓</kbd> 味　<kbd>0–9</kbd> 数量　<kbd>←</kbd>
+            <kbd>→</kbd> 増減
+          </>
+        )}
       </p>
     </div>
   );

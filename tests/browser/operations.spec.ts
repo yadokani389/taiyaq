@@ -15,14 +15,27 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.goto("/staff");
   await page.getByLabel("スタッフ用トークン").fill(token);
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
+  const orderEntry = page.getByRole("region", {
+    name: "注文受付",
+    exact: true,
+  });
+  const productionEntry = page.getByRole("region", {
+    name: "焼き上がり",
+    exact: true,
+  });
   await expect(
-    page.getByRole("button", { name: "粒あん 1個", exact: true }),
+    orderEntry.getByRole("button", { name: "粒あん 1個", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".submit")).toContainText("100番");
+  await expect(productionEntry).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "操作画面" })
+      .getByRole("button", { name: /焼き上がり/ }),
+  ).toHaveCount(0);
+  await expect(orderEntry.locator(".submit")).toContainText("100番");
   for (const [key, heading] of [
-    ["k", "焼き上がり"],
-    ["l", "販売設定"],
-    [";", "履歴"],
+    ["k", "販売設定"],
+    ["l", "履歴"],
     ["j", "注文受付"],
   ] as const) {
     await page.keyboard.press(key);
@@ -36,12 +49,27 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     page.getByRole("heading", { name: "注文受付", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.keyboard.press("d");
+  await page.keyboard.press("d");
+  await page.keyboard.press("s");
+  await page.keyboard.press("d");
+  await page.keyboard.press("a");
+  await page.keyboard.press("w");
+  await expect(productionEntry.getByLabel("粒あんの数量")).toHaveText("2");
+  await expect(productionEntry.getByLabel("カスタードの数量")).toHaveText("0");
+  await expect(orderEntry.getByLabel("粒あんの数量")).toHaveText("0");
+  await page.keyboard.press("/");
+  await page.keyboard.type("wasdf");
+  await expect(productionEntry.getByLabel("粒あんの数量")).toHaveText("2");
+  await expect(page.locator(".notice")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.keyboard.press("1");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("1");
   await page.keyboard.press("Enter");
   await expect(page.locator(".notice")).toContainText("100番で受け付けました");
-  await expect(page.locator(".submit")).toContainText("101番");
+  await expect(orderEntry.locator(".submit")).toContainText("101番");
+  await expect(productionEntry.getByLabel("粒あんの数量")).toHaveText("2");
   await expect(page.locator(".order-row .order-wait")).toHaveText(
     "そろそろできます",
   );
@@ -61,17 +89,15 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
       .getByRole("button", { name: "受付中", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: /注文受付/ }).click();
-  await page
+  await orderEntry
     .getByRole("button", { name: "栗きんとん 2個", exact: true })
     .click();
   await page.getByRole("button", { name: /注文を登録/ }).click();
   await expect(page.locator(".notice")).toContainText("102番で受け付けました");
-  await page
-    .getByRole("button", { name: /焼き上がり/ })
-    .first()
+  await productionEntry
+    .getByRole("button", { name: "粒あん 1個", exact: true })
     .click();
-  await page.getByRole("button", { name: "粒あん 1個", exact: true }).click();
-  await page
+  await productionEntry
     .getByRole("button", { name: "栗きんとん 1個", exact: true })
     .click();
   let dropped = false;
@@ -82,15 +108,27 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     await route.abort("failed");
   });
   await page.keyboard.press("3");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("d");
+  await page.keyboard.press("d");
+  await expect(orderEntry.getByLabel("粒あんの数量")).toHaveText("3");
+  await expect(productionEntry.getByLabel("栗きんとんの数量")).toHaveText("3");
+  await page.keyboard.press("f");
   await expect(page.getByRole("alert")).toContainText(
     "送信結果を確認できません",
   );
+  await page.keyboard.press("d");
+  await page.keyboard.press("f");
+  await expect(productionEntry.getByLabel("栗きんとんの数量")).toHaveText("3");
   await page.getByRole("button", { name: "同じ操作を再送信" }).click();
   await expect(page.locator(".notice")).toContainText(
     "焼き上がりを登録しました",
   );
   await page.unroute("**/api/staff/commands");
+  await expect(orderEntry.getByLabel("粒あんの数量")).toHaveText("3");
+  await expect(productionEntry.getByLabel("粒あんの数量")).toHaveText("0");
+  await orderEntry
+    .getByRole("button", { name: "粒あん 0個", exact: true })
+    .click();
   const response = await context.request.get("/api/staff/state", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -120,7 +158,25 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     "余剰 0",
   ]);
   await page.getByRole("button", { name: /注文受付/ }).click();
+  const orderBounds = await orderEntry.boundingBox();
+  const listBounds = await page.locator(".orders-panel").boundingBox();
+  const productionBounds = await productionEntry.boundingBox();
+  expect(orderBounds!.x).toBeLessThan(listBounds!.x);
+  expect(listBounds!.x).toBeLessThan(productionBounds!.x);
   await page.screenshot({ path: "/tmp/taiyaq-staff.png", fullPage: true });
+  for (const width of [800, 1280, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `/tmp/taiyaq-order-production-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   const search = page.getByRole("textbox", { name: "整理券番号で検索" });
   await search.fill("1000");
   await expect(search).toHaveValue("1000");
@@ -242,9 +298,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(page.locator(".order-row")).toHaveCount(2);
   await page.keyboard.type("100");
   await expect(search).toHaveValue("100");
-  await expect(page.getByLabel("粒あんの数量", { exact: true })).toHaveText(
-    "0",
-  );
+  await expect(
+    orderEntry.getByLabel("粒あんの数量", { exact: true }),
+  ).toHaveText("0");
   await page.keyboard.press("Escape");
   await publicPage.bringToFront();
   await expect(publicPage.locator(".your-order-detail")).toContainText(
@@ -255,10 +311,6 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   );
   await page.bringToFront();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page
-    .getByRole("button", { name: /焼き上がり/ })
-    .first()
-    .click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -372,7 +424,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   );
   await expect(secondOrder.locator(".order-wait")).toHaveCount(0);
   await page.getByRole("button", { name: /注文受付/ }).click();
-  await page.getByRole("button", { name: "粒あん 3個", exact: true }).click();
+  await orderEntry
+    .getByRole("button", { name: "粒あん 3個", exact: true })
+    .click();
   await page.keyboard.press("9");
   await page.keyboard.press("ArrowRight");
   await page.getByRole("button", { name: /注文を登録/ }).click();
@@ -408,11 +462,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page
     .locator(".orders-panel")
     .screenshot({ path: "/tmp/taiyaq-staff-wait-mobile.png" });
-  await page
-    .getByRole("button", { name: /焼き上がり/ })
-    .first()
+  await productionEntry
+    .getByRole("button", { name: "粒あん 2個", exact: true })
     .click();
-  await page.getByRole("button", { name: "粒あん 2個", exact: true }).click();
   await page.getByRole("button", { name: /焼き上がりを登録/ }).click();
   await expect(laterOrder.locator(".order-wait")).toHaveText(
     "そろそろできます",

@@ -20,12 +20,11 @@ import { commandRequestSchema } from "../validation";
 import { ApiError, sendCommand, usePolling } from "./api";
 import { QuantityPicker } from "./QuantityPicker";
 
-type View = "order" | "production" | "settings" | "history";
+type View = "order" | "settings" | "history";
 const views: Array<{ id: View; label: string; key: string }> = [
   { id: "order", label: "注文受付", key: "J" },
-  { id: "production", label: "焼き上がり", key: "K" },
-  { id: "settings", label: "販売設定", key: "L" },
-  { id: "history", label: "履歴", key: ";" },
+  { id: "settings", label: "販売設定", key: "K" },
+  { id: "history", label: "履歴", key: "L" },
 ];
 
 function storedRequest(): CommandRequest | undefined {
@@ -48,7 +47,7 @@ export function Staff() {
   const [view, setView] = useState<View>("order");
   const [orderItems, setOrderItems] = useState<Counts>(zeroCounts);
   const [productionItems, setProductionItems] = useState<Counts>(zeroCounts);
-  const [formVersion, setFormVersion] = useState(0);
+  const [formVersion, setFormVersion] = useState({ order: 0, production: 0 });
   const [pending, setPending] = useState<CommandRequest | undefined>(
     storedRequest,
   );
@@ -70,6 +69,7 @@ export function Staff() {
     function navigate(event: KeyboardEvent) {
       if (
         event.isComposing ||
+        event.repeat ||
         event.ctrlKey ||
         event.metaKey ||
         event.altKey ||
@@ -105,11 +105,14 @@ export function Staff() {
       setPending(undefined);
       if (request.command.type === "order") {
         setOrderItems(zeroCounts());
-        setFormVersion((version) => version + 1);
+        setFormVersion((version) => ({ ...version, order: version.order + 1 }));
         setNotice(`${result.order!.number}番で受け付けました`);
       } else if (request.command.type === "production") {
         setProductionItems(zeroCounts());
-        setFormVersion((version) => version + 1);
+        setFormVersion((version) => ({
+          ...version,
+          production: version.production + 1,
+        }));
         setNotice("焼き上がりを登録しました");
       } else if (request.command.type === "skip") {
         setNotice(`${result.order!.number}番を保留にしました`);
@@ -148,14 +151,14 @@ export function Staff() {
     setPending(request);
     void transmit(request);
   }
-  function submit() {
+  function submit(type: "order" | "production") {
     if (!day) return;
-    const items = view === "order" ? orderItems : productionItems;
+    const items = type === "order" ? orderItems : productionItems;
     if (total(items) === 0) {
       setError("数量を選んでください");
       return;
     }
-    act({ type: view === "order" ? "order" : "production", day, items });
+    act({ type, day, items });
   }
   function updateOrder(
     order: Order,
@@ -199,6 +202,63 @@ export function Staff() {
     setSearch("");
     document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
   }
+  function renderEntry(type: "order" | "production") {
+    if (!state) return null;
+    return (
+      <section
+        className="entry-panel"
+        id={`entry-${type}`}
+        key={type}
+        aria-labelledby={`heading-${type}`}
+      >
+        <div className="panel-heading">
+          <h1 id={`heading-${type}`}>
+            {type === "order" ? "注文受付" : "焼き上がり"}
+          </h1>
+        </div>
+        <QuantityPicker
+          key={formVersion[type]}
+          values={type === "order" ? orderItems : productionItems}
+          onChange={type === "order" ? setOrderItems : setProductionItems}
+          disabled={disabled}
+          unavailable={
+            type === "order"
+              ? state.flavors
+                  .filter(({ enabled }) => !enabled)
+                  .map(({ id }) => id)
+              : []
+          }
+          production={type === "production"}
+          onSubmit={() => submit(type)}
+        />
+        <div className="entry-total">
+          <span>合計</span>
+          <strong>
+            {total(type === "order" ? orderItems : productionItems)}
+            <small>個</small>
+          </strong>
+          {type === "production" && total(productionItems) > 20 ? (
+            <span>20個を超えています</span>
+          ) : null}
+        </div>
+        <button
+          className="primary submit"
+          disabled={
+            disabled ||
+            total(type === "order" ? orderItems : productionItems) === 0
+          }
+          onClick={() => submit(type)}
+          aria-keyshortcuts={type === "order" ? "Enter" : "F"}
+        >
+          {type === "order" ? "注文を登録" : "焼き上がりを登録"}
+          <span>
+            {type === "order" ? `${state.day.lastNumber + 1}番 ` : ""}
+            <kbd>{type === "order" ? "↵" : "F"}</kbd>
+          </span>
+        </button>
+      </section>
+    );
+  }
   if (!token)
     return (
       <main className="login-shell">
@@ -238,6 +298,7 @@ export function Staff() {
               key={id}
               aria-current={view === id ? "page" : undefined}
               onClick={() => setView(id)}
+              aria-keyshortcuts={key}
             >
               {label}
               <kbd>{key}</kbd>
@@ -298,61 +359,20 @@ export function Staff() {
           <button onClick={poll.refresh}>再読み込み</button>
         </main>
       ) : (
-        <main className="staff-workspace">
-          <section className="entry-panel">
-            {view === "settings" ? (
-              <Settings state={state} disabled={disabled} act={act} />
-            ) : view === "history" ? (
-              <History token={token} />
-            ) : (
-              <>
-                <div className="panel-heading">
-                  <h1>{view === "order" ? "注文受付" : "焼き上がり"}</h1>
-                </div>
-                <QuantityPicker
-                  key={`${view}-${formVersion}`}
-                  values={view === "order" ? orderItems : productionItems}
-                  onChange={
-                    view === "order" ? setOrderItems : setProductionItems
-                  }
-                  disabled={disabled}
-                  unavailable={
-                    view === "order"
-                      ? state.flavors
-                          .filter(({ enabled }) => !enabled)
-                          .map(({ id }) => id)
-                      : []
-                  }
-                  production={view === "production"}
-                  onSubmit={submit}
-                />
-                <div className="entry-total">
-                  <span>合計</span>
-                  <strong>
-                    {total(view === "order" ? orderItems : productionItems)}
-                    <small>個</small>
-                  </strong>
-                  {view === "production" && total(productionItems) > 20 ? (
-                    <span>20個を超えています</span>
-                  ) : null}
-                </div>
-                <button
-                  className="primary submit"
-                  disabled={
-                    disabled ||
-                    total(view === "order" ? orderItems : productionItems) === 0
-                  }
-                  onClick={submit}
-                >
-                  {view === "order" ? "注文を登録" : "焼き上がりを登録"}
-                  <span>
-                    {view === "order" ? `${state.day.lastNumber + 1}番 ` : ""}
-                    <kbd>↵</kbd>
-                  </span>
-                </button>
-              </>
-            )}
-          </section>
+        <main
+          className={`staff-workspace ${view === "order" ? "with-production" : ""}`}
+        >
+          {view === "settings" || view === "history" ? (
+            <section className="entry-panel">
+              {view === "settings" ? (
+                <Settings state={state} disabled={disabled} act={act} />
+              ) : (
+                <History token={token} />
+              )}
+            </section>
+          ) : (
+            renderEntry(view)
+          )}
           <section className="orders-panel">
             <div className="panel-heading">
               <h2>
@@ -540,6 +560,7 @@ export function Staff() {
               ) : null}
             </div>
           </section>
+          {view === "order" ? renderEntry("production") : null}
         </main>
       )}
     </>
