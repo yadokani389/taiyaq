@@ -4,13 +4,22 @@ import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { HTTPException } from "hono/http-exception";
 import { validator } from "hono/validator";
+import { sign, verify } from "hono/jwt";
 import * as v from "valibot";
 import { estimateOrderWait, estimateWait, type PublicState } from "../shared";
 import { commandRequestSchema } from "../validation";
 import { UserError } from "./domain";
 import { execute, history, listDays, loadState, orderDetails } from "./store";
+import type { StaffLive } from "./staff-live";
 
-type Bindings = { DB: D1Database; STAFF_API_TOKEN: string; ASSETS?: Fetcher };
+export { StaffLive } from "./staff-live";
+
+type Bindings = {
+  DB: D1Database;
+  STAFF_API_TOKEN: string;
+  STAFF_LIVE: DurableObjectNamespace<StaffLive>;
+  ASSETS?: Fetcher;
+};
 const app = new Hono<{ Bindings: Bindings }>();
 app.use("*", secureHeaders());
 app.use("/api/*", async (c, next) => {
@@ -21,6 +30,21 @@ app.use("/api/*", bodyLimit({ maxSize: 8192 }));
 app.use("/api/staff/*", async (c, next) => {
   const token = c.env.STAFF_API_TOKEN;
   if (!token) throw new UserError("スタッフ認証が設定されていません", 503);
+  if (c.req.path === "/api/staff/live" && c.req.method === "GET") {
+    const origin = new URL(c.req.url).origin;
+    if (c.req.header("Origin") !== origin)
+      throw new HTTPException(403, { message: "接続元が正しくありません" });
+    try {
+      await verify(c.req.query("ticket") ?? "", token, {
+        alg: "HS256",
+        aud: `${origin}/api/staff/live`,
+      });
+    } catch {
+      throw new UserError("接続チケットが無効です", 401);
+    }
+    await next();
+    return;
+  }
   return authenticate<{ Bindings: Bindings }>({ token })(c, next);
 });
 app.onError((error, c) => {
@@ -35,6 +59,28 @@ app.onError((error, c) => {
 });
 
 const routes = app
+  .post("/api/staff/live-ticket", async (c) =>
+    c.json({
+      ticket: await sign(
+        {
+          aud: `${new URL(c.req.url).origin}/api/staff/live`,
+          exp: Math.floor(Date.now() / 1000) + 30,
+        },
+        c.env.STAFF_API_TOKEN,
+        "HS256",
+      ),
+    }),
+  )
+  .get("/api/staff/live", async (c) => {
+    if (c.req.header("Upgrade")?.toLowerCase() !== "websocket")
+      throw new UserError("WebSocket接続が必要です", 400);
+    const response = await c.env.STAFF_LIVE.getByName("staff").fetch(c.req.raw);
+    return new Response(response.body, {
+      status: response.status,
+      headers: response.headers,
+      webSocket: response.webSocket,
+    });
+  })
   .get("/api/status", async (c) => {
     const state = await loadState(c.env.DB);
     const result: PublicState = {
@@ -86,7 +132,9 @@ const routes = app
     }),
     async (c) => {
       const { operationId, command } = c.req.valid("json");
-      return c.json(await execute(c.env.DB, operationId, command));
+      const result = await execute(c.env.DB, operationId, command);
+      await c.env.STAFF_LIVE.getByName("staff").broadcast();
+      return c.json(result);
     },
   );
 app.notFound(async (c) => {

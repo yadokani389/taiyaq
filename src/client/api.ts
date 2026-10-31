@@ -13,7 +13,7 @@ export class ApiError extends Error {
   }
 }
 
-async function readJson<T>(
+export async function readJson<T>(
   response: Pick<Response, "json" | "ok" | "status">,
 ): Promise<T> {
   let body: unknown;
@@ -53,7 +53,14 @@ export async function sendCommand(
   );
 }
 
-export function usePolling<T>(path: string | null, token?: string) {
+export function usePolling<T>(
+  path: string | null,
+  token?: string,
+  {
+    refreshKey,
+    interval = 5000,
+  }: { refreshKey?: string; interval?: number | false } = {},
+) {
   const [data, setData] = useState<T>();
   const [loadedPath, setLoadedPath] = useState<string>();
   const [error, setError] = useState<string>();
@@ -67,6 +74,7 @@ export function usePolling<T>(path: string | null, token?: string) {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     let active = true;
+    let failures = 0;
     async function poll() {
       try {
         const response = await fetch(path!, {
@@ -83,19 +91,27 @@ export function usePolling<T>(path: string | null, token?: string) {
           setLoadedPath(path!);
           setError(undefined);
           setUpdatedAt(Date.now());
+          failures = 0;
         }
       } catch (error) {
-        if (active)
+        if (active) {
+          failures++;
           setError(
             error instanceof Error ? error.message : "通信に失敗しました",
           );
+        }
       } finally {
-        if (active)
+        if (active && (interval !== false || failures > 0))
           timer = setTimeout(
             () => {
               void poll();
             },
-            document.hidden ? 30000 : 5000,
+            document.hidden
+              ? 30000
+              : Math.min(
+                  30000,
+                  (interval === false ? 5000 : interval) * 2 ** failures,
+                ),
           );
       }
     }
@@ -105,7 +121,7 @@ export function usePolling<T>(path: string | null, token?: string) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [path, token, version]);
+  }, [path, token, version, refreshKey, interval]);
   return {
     data: loadedPath === path ? data : undefined,
     error,

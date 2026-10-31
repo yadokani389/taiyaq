@@ -47,6 +47,7 @@ export type State = {
   orders: Order[];
 };
 export type StaffState = State & { soldCount: number };
+export type StaffStreamMessage = { type: "state"; state: StaffState };
 export type Command =
   | { type: "order"; day: string; items: Counts }
   | { type: "production"; day: string; items: Counts }

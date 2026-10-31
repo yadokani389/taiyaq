@@ -43,12 +43,14 @@ beforeAll(async () => {
     write: false,
     format: "esm",
     target: "es2022",
+    external: ["cloudflare:workers"],
   });
   mf = new Miniflare({
     modules: true,
     script: worker.outputFiles[0]!.text,
     compatibilityDate: "2026-07-30",
     d1Databases: ["DB"],
+    durableObjects: { STAFF_LIVE: { className: "StaffLive", useSQLite: true } },
     bindings: { STAFF_API_TOKEN: token },
   });
   const db = await mf.getD1Database("DB");
@@ -368,3 +370,87 @@ it("switches at midnight in Japan while retaining history, settings and retry re
   expect((await loadState(db, midnight)).orders).toHaveLength(2);
   expect(await history(db, request.day)).toHaveLength(1);
 });
+
+it("authenticates staff streams, pushes snapshots to every client and restores state on reconnect", async () => {
+  const { sign } = await import("hono/jwt");
+  const open = (ticket: string, origin = "http://localhost") =>
+    mf.dispatchFetch(
+      `http://localhost/api/staff/live?ticket=${encodeURIComponent(ticket)}`,
+      {
+        headers: { Upgrade: "websocket", Origin: origin },
+      },
+    );
+  expect((await request("/api/staff/live-ticket", {}, false)).status).toBe(401);
+  expect((await open("invalid")).status).toBe(401);
+  const expired = await sign(
+    { aud: "http://localhost/api/staff/live", exp: 1 },
+    token,
+  );
+  expect((await open(expired)).status).toBe(401);
+  const wrongAudience = await sign(
+    { aud: "other", exp: Math.floor(Date.now() / 1000) + 30 },
+    token,
+  );
+  expect((await open(wrongAudience)).status).toBe(401);
+
+  async function connect() {
+    const { ticket } = (await (
+      await request("/api/staff/live-ticket", {})
+    ).json()) as { ticket: string };
+    expect((await open(ticket, "https://other.example")).status).toBe(403);
+    const response = await open(ticket);
+    expect(response.status).toBe(101);
+    const socket = response.webSocket!;
+    const messages: string[] = [];
+    socket.addEventListener("message", (event) =>
+      messages.push(event.data as string),
+    );
+    socket.accept();
+    async function next() {
+      await expect.poll(() => messages.length).toBeGreaterThan(0);
+      return messages.shift()!;
+    }
+    return { socket, next };
+  }
+
+  const first = await connect();
+  const second = await connect();
+  const initial = JSON.parse(await first.next()) as {
+    type: string;
+    state: State;
+  };
+  expect(initial.type).toBe("state");
+  expect(JSON.parse(await second.next())).toEqual(initial);
+  first.socket.send("ping");
+  expect(await first.next()).toBe("pong");
+  const flavor = initial.state.flavors[0]!;
+  const operationId = crypto.randomUUID();
+  const change: Command = {
+    type: "flavor",
+    flavor: { ...flavor, enabled: !flavor.enabled },
+  };
+  const result = await command(change, operationId);
+  const updated = JSON.parse(await first.next()) as { state: State };
+  expect(JSON.parse(await second.next())).toEqual(updated);
+  expect(updated.state.revision).toBe(initial.state.revision + 1);
+  expect(updated.state.flavors[0]!.enabled).toBe(!flavor.enabled);
+  expect(await command(change, operationId)).toEqual(result);
+  expect(JSON.parse(await first.next())).toEqual(updated);
+  expect(JSON.parse(await second.next())).toEqual(updated);
+  first.socket.close();
+  const reconnected = await connect();
+  expect(JSON.parse(await reconnected.next())).toEqual(updated);
+  reconnected.socket.send("sync");
+  expect(JSON.parse(await reconnected.next())).toEqual(updated);
+  const closed = new Promise<number>((resolve) => {
+    reconnected.socket.addEventListener(
+      "close",
+      (event) => resolve(event.code),
+      { once: true },
+    );
+  });
+  reconnected.socket.send("unsupported");
+  expect(await closed).toBe(1008);
+  reconnected.socket.close();
+  second.socket.close();
+}, 15000);

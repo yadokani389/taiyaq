@@ -14,11 +14,11 @@ import {
   type Flavor,
   type Order,
   type State,
-  type StaffState,
 } from "../shared";
 import { commandRequestSchema } from "../validation";
 import { ApiError, sendCommand, usePolling } from "./api";
 import { QuantityPicker } from "./QuantityPicker";
+import { useStaffState } from "./useStaffState";
 
 type View = "order" | "settings" | "history";
 const views: Array<{ id: View; label: string; key: string }> = [
@@ -55,7 +55,7 @@ export function Staff() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const poll = usePolling<StaffState>(token ? "/api/staff/state" : null, token);
+  const poll = useStaffState(token);
   const state = poll.data;
   const day = state?.day.id;
   const disabled = busy || Boolean(pending);
@@ -325,7 +325,11 @@ export function Staff() {
       </header>
       <div className="service-bar">
         <span>{day ?? "読み込み中…"}</span>
-        <Freshness error={poll.error} updatedAt={poll.updatedAt} />
+        <Freshness
+          error={poll.error}
+          updatedAt={poll.updatedAt}
+          live={poll.live}
+        />
         <a href="/display" target="_blank" rel="noreferrer">
           店頭モニター ↗
         </a>
@@ -367,7 +371,7 @@ export function Staff() {
               {view === "settings" ? (
                 <Settings state={state} disabled={disabled} act={act} />
               ) : (
-                <History token={token} />
+                <History token={token} state={state} live={poll.live} />
               )}
             </section>
           ) : (
@@ -570,17 +574,21 @@ export function Staff() {
 export function Freshness({
   error,
   updatedAt,
+  live,
 }: {
   error?: string;
   updatedAt?: number;
+  live?: boolean;
 }) {
   return (
     <span className={`freshness ${error ? "offline" : ""}`}>
       {error
         ? "更新できていません"
-        : updatedAt
-          ? `更新 ${new Date(updatedAt).toLocaleTimeString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" })}`
-          : "接続中…"}
+        : live
+          ? "リアルタイム更新中"
+          : updatedAt
+            ? `${live === false ? "定期更新中 · " : "更新 "}${new Date(updatedAt).toLocaleTimeString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" })}`
+            : "接続中…"}
     </span>
   );
 }
@@ -723,13 +731,26 @@ function FlavorSettings({
   );
 }
 
-function History({ token }: { token: string }) {
-  const days = usePolling<Day[]>("/api/staff/days", token);
+function History({
+  token,
+  state,
+  live,
+}: {
+  token: string;
+  state: State;
+  live: boolean;
+}) {
+  const options = {
+    refreshKey: `${state.day.id}:${state.revision}`,
+    interval: live ? (false as const) : 2000,
+  };
+  const days = usePolling<Day[]>("/api/staff/days", token, options);
   const [day, setDay] = useState("");
   const selectedDay = day || days.data?.[0]?.id;
   const history = usePolling<Order[]>(
     selectedDay ? `/api/staff/history/${selectedDay}` : null,
     token,
+    options,
   );
   return (
     <>

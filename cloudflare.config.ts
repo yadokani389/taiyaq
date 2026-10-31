@@ -1,4 +1,4 @@
-import { bindings, defineConfig } from "cf/config";
+import { bindings, defineConfig, exports } from "cf/config";
 
 export const databaseId = "c0768502-882a-46dc-9dc5-0a2d5c9af428";
 
@@ -12,10 +12,15 @@ export default defineConfig({
     previewUrls: false,
     assets: { notFoundHandling: "single-page-application" },
     observability: { enabled: true },
+    exports: { StaffLive: exports.durableObject({ storage: "sqlite" }) },
     env: {
       ASSETS: bindings.assets(),
       DB: bindings.d1({ name: "taiyaq", id: databaseId }),
       STAFF_API_TOKEN: bindings.secret(),
+      STAFF_LIVE: bindings.durableObject({
+        worker: "taiyaq",
+        exportName: "StaffLive",
+      }),
     },
   },
 });
