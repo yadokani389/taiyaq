@@ -445,6 +445,9 @@ button[aria-pressed="true"]:hover:enabled {
 .order-row.ready .ticket-number {
   color: #386345;
 }
+.order-row.recent-ready .ticket-number {
+  background: linear-gradient(transparent 65%, #f2d798 65%);
+}
 .order-row.skipped .ticket-number {
   color: var(--muted);
 }

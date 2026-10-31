@@ -19,6 +19,7 @@ import { commandRequestSchema } from "../validation";
 import { ApiError, sendCommand, usePolling } from "./api";
 import { QuantityPicker } from "./QuantityPicker";
 import { useStaffState } from "./useStaffState";
+import { useRecentReady } from "./useRecentReady";
 
 type View = "order" | "settings" | "history";
 const views: Array<{ id: View; label: string; key: string }> = [
@@ -58,6 +59,7 @@ export function Staff() {
   const poll = useStaffState(token);
   const state = poll.data;
   const day = state?.day.id;
+  const recentReady = useRecentReady(day, state?.orders);
   const disabled = busy || Boolean(pending);
   const selectedOrder = state?.orders.find(
     ({ number }) => number === Number(search),
@@ -474,7 +476,7 @@ export function Staff() {
                   const waitMinutes = estimateOrderWait(state, order);
                   return (
                     <article
-                      className={`order-row ${order.status}${order.prioritySequence === null ? "" : " priority"}`}
+                      className={`order-row ${order.status}${order.prioritySequence === null ? "" : " priority"}${recentReady.has(order.id) ? " recent-ready" : ""}`}
                       key={order.id}
                     >
                       <strong className="ticket-number">
