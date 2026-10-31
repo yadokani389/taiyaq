@@ -18,6 +18,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await expect(
     page.getByRole("button", { name: "粒あん 1個", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".submit")).toContainText("100番");
   for (const [key, heading] of [
     ["k", "焼き上がり"],
     ["l", "販売設定"],
@@ -40,6 +41,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press("1");
   await page.keyboard.press("Enter");
   await expect(page.locator(".notice")).toContainText("100番で受け付けました");
+  await expect(page.locator(".submit")).toContainText("101番");
   await expect(page.locator(".order-row .order-wait")).toHaveText(
     "そろそろできます",
   );
@@ -60,7 +62,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   ).toBeVisible();
   await page.getByRole("button", { name: /注文受付/ }).click();
   await page
-    .getByRole("button", { name: "栗きんとん 1個", exact: true })
+    .getByRole("button", { name: "栗きんとん 2個", exact: true })
     .click();
   await page.getByRole("button", { name: /注文を登録/ }).click();
   await expect(page.locator(".notice")).toContainText("102番で受け付けました");
@@ -79,7 +81,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     await route.fetch();
     await route.abort("failed");
   });
-  await page.keyboard.press("1");
+  await page.keyboard.press("3");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("alert")).toContainText(
     "送信結果を確認できません",
@@ -102,6 +104,21 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   expect(state.orders[1]!.allocated.tsubuan).toBe(0);
   expect(state.orders[1]!.items.tsubuan).toBe(1);
   expect(state.orders[1]!.items.custard).toBe(0);
+  const stock = page.locator(".stock-strip");
+  const readyTotal = page.locator(".ready-total");
+  await expect(readyTotal).toHaveText("販売済み 0個");
+  await expect(stock).not.toContainText("盤面");
+  const kurikintonStock = stock
+    .locator(":scope > div")
+    .filter({ hasText: "栗きんとん" });
+  await expect(stock.locator("strong")).toHaveText(["1", "0", "3", "0", "0"]);
+  await expect(stock.locator(".stock-surplus")).toHaveText([
+    "余剰 0",
+    "余剰 0",
+    "余剰 1",
+    "余剰 0",
+    "余剰 0",
+  ]);
   await page.getByRole("button", { name: /注文受付/ }).click();
   await page.screenshot({ path: "/tmp/taiyaq-staff.png", fullPage: true });
   const search = page.getByRole("textbox", { name: "整理券番号で検索" });
@@ -114,6 +131,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press(".");
   await expect(page.locator(".order-row.skipped")).toContainText("102");
   await expect(page.locator(".order-row.skipped .order-wait")).toHaveCount(0);
+  await expect(readyTotal).toHaveText("販売済み 0個");
+  await expect(kurikintonStock.locator("strong")).toHaveText("3");
+  await expect(kurikintonStock.locator(".stock-surplus")).toHaveText("余剰 3");
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
   await page
@@ -155,6 +175,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   ).toBeEnabled();
   await page.keyboard.press("Enter");
   await expect(page.locator(".notice")).toContainText("102番を列に戻しました");
+  await expect(readyTotal).toHaveText("販売済み 0個");
+  await expect(kurikintonStock.locator("strong")).toHaveText("3");
+  await expect(kurikintonStock.locator(".stock-surplus")).toHaveText("余剰 1");
   await expect(receive).toBeEnabled();
   await expect(search).toHaveValue("102");
   await page.keyboard.press("Escape");
@@ -211,6 +234,9 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   });
   await page.keyboard.press("Enter");
   await expect(page.locator(".order-row.ready")).toHaveCount(0);
+  await expect(readyTotal).toHaveText("販売済み 2個");
+  await page.screenshot({ path: "/tmp/taiyaq-sold.png", fullPage: true });
+  await expect(kurikintonStock.locator("strong")).toHaveText("1");
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
   await expect(page.locator(".order-row")).toHaveCount(2);
@@ -313,6 +339,7 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.keyboard.press("/");
   await page.keyboard.press("Escape");
   await page.reload();
+  await expect(readyTotal).toHaveText("販売済み 2個");
   await expect(firstOrder.locator(".status-label")).toHaveText("優先待ち");
   await expect(secondOrder.locator(".status-label")).toHaveText("受け取り可能");
   await publicPage.goto("/");

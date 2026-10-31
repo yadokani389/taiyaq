@@ -336,6 +336,7 @@ it("switches at midnight in Japan while retaining history, settings and retry re
   });
   expect(next.stock).toEqual(zeroCounts());
   expect(next.orders).toEqual([]);
+  expect(next.soldCount).toBe(0);
   expect(next.flavors[0]).toMatchObject({ cookingMinutes: 12, perBatch: 8 });
   expect((await history(db, request.day))[0]).toMatchObject({
     id: first.order!.id,

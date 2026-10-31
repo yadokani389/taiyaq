@@ -14,6 +14,7 @@ import {
   type Flavor,
   type Order,
   type State,
+  type StaffState,
 } from "../shared";
 import { commandRequestSchema } from "../validation";
 import { ApiError, sendCommand, usePolling } from "./api";
@@ -55,7 +56,7 @@ export function Staff() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const poll = usePolling<State>(token ? "/api/staff/state" : null, token);
+  const poll = usePolling<StaffState>(token ? "/api/staff/state" : null, token);
   const state = poll.data;
   const day = state?.day.id;
   const disabled = busy || Boolean(pending);
@@ -243,16 +244,23 @@ export function Staff() {
             </button>
           ))}
         </nav>
-        <button
-          className="text-button"
-          disabled={disabled}
-          onClick={() => {
-            sessionStorage.removeItem("taiyaq:staff");
-            setToken("");
-          }}
-        >
-          ログアウト
-        </button>
+        <div className="header-actions">
+          {state ? (
+            <div className="ready-total">
+              販売済み <strong>{state.soldCount}</strong>個
+            </div>
+          ) : null}
+          <button
+            className="text-button"
+            disabled={disabled}
+            onClick={() => {
+              sessionStorage.removeItem("taiyaq:staff");
+              setToken("");
+            }}
+          >
+            ログアウト
+          </button>
+        </div>
       </header>
       <div className="service-bar">
         <span>{day ?? "読み込み中…"}</span>
@@ -337,7 +345,10 @@ export function Staff() {
                   onClick={submit}
                 >
                   {view === "order" ? "注文を登録" : "焼き上がりを登録"}
-                  <kbd>↵</kbd>
+                  <span>
+                    {view === "order" ? `${state.day.lastNumber + 1}番 ` : ""}
+                    <kbd>↵</kbd>
+                  </span>
                 </button>
               </>
             )}
@@ -412,8 +423,15 @@ export function Staff() {
               {FLAVORS.map(({ id, name }) => (
                 <div key={id}>
                   <span>{name}</span>
-                  <strong>{state.stock[id]}</strong>
-                  <small>余剰</small>
+                  <strong>
+                    {state.orders.reduce(
+                      (sum, order) => sum + order.allocated[id],
+                      state.stock[id],
+                    )}
+                  </strong>
+                  <small className="stock-surplus">
+                    余剰 {state.stock[id]}
+                  </small>
                 </div>
               ))}
             </div>

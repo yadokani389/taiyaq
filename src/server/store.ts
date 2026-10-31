@@ -9,7 +9,7 @@ import {
   type Day,
   type Flavor,
   type Order,
-  type State,
+  type StaffState,
 } from "../shared";
 import { applyCommand, UserError } from "./domain";
 
@@ -42,9 +42,9 @@ export function fromOrderRow(row: OrderRow): Order {
 export async function loadState(
   db: D1Database,
   now = new Date(),
-): Promise<State> {
+): Promise<StaffState> {
   const today = japanDate(now);
-  const [meta, days, stock, orders, flavors] = await db.batch([
+  const [meta, days, stock, orders, flavors, sold] = await db.batch([
     db.prepare("SELECT revision FROM app_state WHERE id = 1"),
     db
       .prepare("SELECT id, last_number, next_sequence FROM days WHERE id = ?")
@@ -56,6 +56,11 @@ export async function loadState(
       )
       .bind(today),
     db.prepare("SELECT * FROM flavors"),
+    db
+      .prepare(
+        "SELECT COALESCE(SUM(item.value), 0) AS count FROM orders, json_each(orders.items) AS item WHERE orders.day = ? AND orders.status = 'completed'",
+      )
+      .bind(today),
   ]);
   const day = days!.results[0] as
     | {
@@ -71,6 +76,7 @@ export async function loadState(
     per_batch: number;
   }>;
   return {
+    soldCount: (sold!.results[0] as { count: number }).count,
     revision: (meta!.results[0] as { revision: number }).revision,
     day: {
       id: today,

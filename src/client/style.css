@@ -143,6 +143,24 @@ button[aria-pressed="true"]:hover:enabled {
   height: 100%;
   gap: 5px;
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.header-actions .text-button {
+  padding: 2px 4px;
+  font-size: 12px;
+}
+.ready-total {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ready-total strong {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  margin: 0 4px;
+}
 .app-header nav button {
   border: 0;
   border-bottom: 3px solid transparent;
@@ -373,6 +391,10 @@ button[aria-pressed="true"]:hover:enabled {
 }
 .stock-strip small {
   font-size: 10px;
+}
+.stock-surplus {
+  width: 100%;
+  color: var(--muted);
 }
 .orders-panel > .panel-heading {
   flex-wrap: wrap;
