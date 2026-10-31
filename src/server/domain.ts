@@ -50,14 +50,20 @@ export function applyCommand(
     state.flavors[index] = command.flavor;
     return {};
   }
+  if (state.day.id !== command.day) {
+    throw new UserError("営業日が変わっています。画面を更新してください", 409);
+  }
   if (command.type === "order") {
     for (const { id, enabled } of state.flavors) {
       if (!enabled && command.items[id] > 0)
         throw new UserError("受付を停止している味が含まれています", 409);
     }
+    const number = state.day.lastNumber + 1;
     const order = {
       id: newId,
-      number: ++state.lastNumber,
+      day: state.day.id,
+      sequence: state.day.nextSequence++,
+      number,
       status: "waiting" as const,
       prioritySequence: null,
       items: command.items,
@@ -65,6 +71,7 @@ export function applyCommand(
       createdAt: now,
       finishedAt: null,
     };
+    state.day.lastNumber = number;
     state.orders.push(order);
     allocate(state);
     return { order };

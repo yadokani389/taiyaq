@@ -94,6 +94,7 @@ export function Public({ display = false }: { display?: boolean }) {
                     type="number"
                     inputMode="numeric"
                     min={1}
+                    placeholder="整理券番号"
                     value={number}
                     onChange={(event) => setNumber(event.target.value)}
                     required
@@ -114,17 +115,44 @@ export function Public({ display = false }: { display?: boolean }) {
                     <small>番</small>
                   </strong>
                   <div>
-                    <h1>{STATUS_LABELS[detail.data.order.status]}</h1>
-                    {detail.data.order.status === "waiting" ? (
-                      <p>
-                        {detail.data.waitMinutes === 0
-                          ? "そろそろできます"
-                          : `約${detail.data.waitMinutes}分後`}
-                      </p>
-                    ) : null}
-                    {detail.data.order.status === "ready" ? (
-                      <p>整理券を持って受け取り口へお越しください</p>
-                    ) : null}
+                    {status.error || detail.error ? (
+                      <>
+                        <h1>注文の状態を確認できません</h1>
+                        <p>通信を確認し、もう一度お試しください。</p>
+                      </>
+                    ) : detail.data.order.day !== data.day ? (
+                      <>
+                        <h1>過去の営業日の注文</h1>
+                        <p>
+                          {detail.data.order.day}
+                          の注文です。当日の注文には引き継がれていません。
+                        </p>
+                        <p>
+                          記録された状態：
+                          {STATUS_LABELS[detail.data.order.status]}
+                        </p>
+                        {detail.data.order.status === "waiting" ||
+                        detail.data.order.status === "ready" ? (
+                          <p>
+                            受け取りについてはスタッフにお問い合わせください。
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <h1>{STATUS_LABELS[detail.data.order.status]}</h1>
+                        {detail.data.order.status === "waiting" ? (
+                          <p>
+                            {detail.data.waitMinutes === 0
+                              ? "そろそろできます"
+                              : `約${detail.data.waitMinutes}分後`}
+                          </p>
+                        ) : null}
+                        {detail.data.order.status === "ready" ? (
+                          <p>整理券を持って受け取り口へお越しください</p>
+                        ) : null}
+                      </>
+                    )}
                     <p>
                       {FLAVORS.filter(
                         ({ id }) => detail.data!.order.items[id] > 0,

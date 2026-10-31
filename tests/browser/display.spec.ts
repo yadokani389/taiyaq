@@ -1,5 +1,69 @@
 import { test, expect } from "@playwright/test";
 
+test("does not give pickup instructions when status refresh fails", async ({
+  page,
+}) => {
+  let online = true;
+  await page.route("**/api/status", (route) =>
+    online
+      ? route.fulfill({ json: { day: "2026-10-31", flavors: [], orders: [] } })
+      : route.fulfill({ status: 503, json: { error: "offline" } }),
+  );
+  await page.route("**/api/orders/*", (route) =>
+    route.fulfill({
+      json: {
+        order: {
+          id: "old",
+          day: "2026-10-31",
+          number: 100,
+          status: "ready",
+          items: {},
+        },
+        waitMinutes: 0,
+      },
+    }),
+  );
+  await page.goto("/?order=old");
+  const detail = page.locator(".your-order-detail");
+  await expect(detail).toContainText("受け取り口へお越しください");
+  online = false;
+  await expect(detail).toContainText("状態を確認できません", {
+    timeout: 10000,
+  });
+  await expect(detail).not.toContainText("受け取り口へお越しください");
+});
+
+test("historical orders do not promise a pickup or wait time", async ({
+  page,
+}) => {
+  await page.route("**/api/status", (route) =>
+    route.fulfill({ json: { day: "2026-10-31", flavors: [], orders: [] } }),
+  );
+  let status = "waiting";
+  await page.route("**/api/orders/*", (route) =>
+    route.fulfill({
+      json: {
+        order: {
+          id: "previous",
+          day: "2026-10-30",
+          number: 100,
+          status,
+          items: {},
+        },
+        waitMinutes: 0,
+      },
+    }),
+  );
+  await page.goto("/?order=previous");
+  const detail = page.locator(".your-order-detail");
+  await expect(detail).toContainText("過去の営業日の注文");
+  await expect(detail).not.toContainText("そろそろできます");
+  status = "ready";
+  await page.reload();
+  await expect(detail).toContainText("過去の営業日の注文");
+  await expect(detail).not.toContainText("受け取り口へお越しください");
+});
+
 test("display links to the public page with a visible QR code", async ({
   page,
   baseURL,
@@ -12,6 +76,7 @@ test("display links to the public page with a visible QR code", async ({
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
+        day: "2026-10-28",
         flavors: [],
         orders: Array.from({ length: 99 }, (_, index) => ({
           id: String(index + 1),

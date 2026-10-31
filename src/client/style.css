@@ -520,6 +520,12 @@ button[aria-pressed="true"]:hover:enabled {
   margin-top: 10px;
   width: 100%;
 }
+.day-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
 .history-row {
   padding: 14px 0;
   border-bottom: 1px solid var(--line);

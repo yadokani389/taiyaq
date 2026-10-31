@@ -10,6 +10,7 @@ import {
   type Command,
   type CommandRequest,
   type Counts,
+  type Day,
   type Flavor,
   type Order,
   type State,
@@ -56,6 +57,7 @@ export function Staff() {
   const [search, setSearch] = useState("");
   const poll = usePolling<State>(token ? "/api/staff/state" : null, token);
   const state = poll.data;
+  const day = state?.day.id;
   const disabled = busy || Boolean(pending);
   const selectedOrder = state?.orders.find(
     ({ number }) => number === Number(search),
@@ -146,13 +148,13 @@ export function Staff() {
     void transmit(request);
   }
   function submit() {
-    if (!state) return;
+    if (!day) return;
     const items = view === "order" ? orderItems : productionItems;
     if (total(items) === 0) {
       setError("数量を選んでください");
       return;
     }
-    act({ type: view === "order" ? "order" : "production", items });
+    act({ type: view === "order" ? "order" : "production", day, items });
   }
   function updateOrder(
     order: Order,
@@ -164,13 +166,13 @@ export function Staff() {
       | "prioritize"
       | "unprioritize",
   ) {
-    if (!state) return;
+    if (!day) return;
     if (
       type === "cancel" &&
       !window.confirm(`${order.number}番の注文をキャンセルしますか？`)
     )
       return;
-    act({ type, orderId: order.id });
+    act({ type, day, orderId: order.id });
     if (type === "prioritize" || type === "unprioritize")
       document.querySelector<HTMLInputElement>("#ticket-search")?.focus();
   }
@@ -253,6 +255,7 @@ export function Staff() {
         </button>
       </header>
       <div className="service-bar">
+        <span>{day ?? "読み込み中…"}</span>
         <Freshness error={poll.error} updatedAt={poll.updatedAt} />
         <a href="/display" target="_blank" rel="noreferrer">
           店頭モニター ↗
@@ -579,7 +582,7 @@ function Settings({
             const fields = new FormData(event.currentTarget);
             const items = zeroCounts();
             for (const { id } of FLAVORS) items[id] = Number(fields.get(id));
-            act({ type: "adjust", items });
+            act({ type: "adjust", day: state.day.id, items });
           }
         }}
       >
@@ -682,13 +685,32 @@ function FlavorSettings({
 }
 
 function History({ token }: { token: string }) {
-  const history = usePolling<Order[]>("/api/staff/history", token);
+  const days = usePolling<Day[]>("/api/staff/days", token);
+  const [day, setDay] = useState("");
+  const selectedDay = day || days.data?.[0]?.id;
+  const history = usePolling<Order[]>(
+    selectedDay ? `/api/staff/history/${selectedDay}` : null,
+    token,
+  );
   return (
     <>
       <div className="panel-heading">
         <h1>履歴</h1>
       </div>
-      {history.error ? <p role="alert">{history.error}</p> : null}
+      <div className="day-list">
+        {days.data?.map(({ id }) => (
+          <button
+            key={id}
+            aria-pressed={id === selectedDay}
+            onClick={() => setDay(id)}
+          >
+            {id}
+          </button>
+        ))}
+      </div>
+      {days.error || history.error ? (
+        <p role="alert">{days.error || history.error}</p>
+      ) : null}
       {history.data?.map((order) => (
         <article className="history-row" key={order.id}>
           <strong>{order.number}番</strong>

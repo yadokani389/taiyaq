@@ -105,10 +105,10 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
   await page.getByRole("button", { name: /注文受付/ }).click();
   await page.screenshot({ path: "/tmp/taiyaq-staff.png", fullPage: true });
   const search = page.getByRole("textbox", { name: "整理券番号で検索" });
-  const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
   await search.fill("1000");
   await expect(search).toHaveValue("1000");
-  await search.press("Escape");
+  await page.keyboard.press("Escape");
+  const receive = page.getByRole("button", { name: "受け渡し ↵", exact: true });
   await page.keyboard.press("/");
   await page.keyboard.type("102");
   await page.keyboard.press(".");
@@ -395,12 +395,14 @@ test("keyboard and mouse orders, flavor FIFO, retry, receiving and public screen
     "そろそろできます",
   );
   await page.getByRole("button", { name: /履歴/ }).click();
+  await expect(page.locator(".day-list")).toContainText(state.day.id);
   await expect(page.locator(".history-row")).toHaveCount(4);
-  await expect(page.locator(".day-list")).toHaveCount(0);
-  await page.screenshot({
-    path: "/tmp/taiyaq-continuous-history.png",
-    fullPage: true,
-  });
+  await expect(page.locator(".history-row")).toContainText([
+    "103番",
+    "102番",
+    "101番",
+    "100番",
+  ]);
   expect(consoleErrors).toEqual([]);
   expect(errors).toEqual([]);
 });

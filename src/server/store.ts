@@ -1,8 +1,12 @@
 import {
+  FIRST_TICKET_NUMBER,
   FLAVORS,
+  zeroCounts,
+  japanDate,
   type Command,
   type CommandResult,
   type Counts,
+  type Day,
   type Flavor,
   type Order,
   type State,
@@ -23,6 +27,8 @@ type OrderRow = Omit<
 export function fromOrderRow(row: OrderRow): Order {
   return {
     id: row.id,
+    day: row.day,
+    sequence: row.sequence,
     number: row.number,
     status: row.status,
     prioritySequence: row.priority_sequence,
@@ -33,21 +39,31 @@ export function fromOrderRow(row: OrderRow): Order {
   };
 }
 
-export async function loadState(db: D1Database): Promise<State> {
-  const [meta, orders, flavors] = await db.batch([
-    db.prepare(
-      "SELECT revision, last_number, stock FROM app_state WHERE id = 1",
-    ),
-    db.prepare(
-      "SELECT * FROM orders WHERE status IN ('waiting', 'ready', 'skipped') ORDER BY number",
-    ),
+export async function loadState(
+  db: D1Database,
+  now = new Date(),
+): Promise<State> {
+  const today = japanDate(now);
+  const [meta, days, stock, orders, flavors] = await db.batch([
+    db.prepare("SELECT revision FROM app_state WHERE id = 1"),
+    db
+      .prepare("SELECT id, last_number, next_sequence FROM days WHERE id = ?")
+      .bind(today),
+    db.prepare("SELECT counts FROM inventory WHERE day = ?").bind(today),
+    db
+      .prepare(
+        "SELECT * FROM orders WHERE day = ? AND status IN ('waiting', 'ready', 'skipped') ORDER BY sequence",
+      )
+      .bind(today),
     db.prepare("SELECT * FROM flavors"),
   ]);
-  const state = meta!.results[0] as {
-    revision: number;
-    last_number: number;
-    stock: string;
-  };
+  const day = days!.results[0] as
+    | {
+        id: string;
+        last_number: number;
+        next_sequence: number;
+      }
+    | undefined;
   const settings = flavors!.results as Array<{
     id: Flavor["id"];
     enabled: number;
@@ -55,9 +71,15 @@ export async function loadState(db: D1Database): Promise<State> {
     per_batch: number;
   }>;
   return {
-    revision: state.revision,
-    lastNumber: state.last_number,
-    stock: JSON.parse(state.stock) as Counts,
+    revision: (meta!.results[0] as { revision: number }).revision,
+    day: {
+      id: today,
+      lastNumber: day?.last_number ?? FIRST_TICKET_NUMBER - 1,
+      nextSequence: day?.next_sequence ?? 1,
+    },
+    stock: stock!.results[0]
+      ? (JSON.parse((stock!.results[0] as { counts: string }).counts) as Counts)
+      : zeroCounts(),
     orders: (orders!.results as OrderRow[]).map(fromOrderRow),
     flavors: FLAVORS.map(({ id }) => {
       const flavor = settings.find((value) => value.id === id)!;
@@ -96,7 +118,7 @@ export async function execute(
   for (let attempt = 0; attempt < 5; attempt++) {
     const previous = await replay(db, operationId, request);
     if (previous) return previous;
-    const before = await loadState(db);
+    const before = await loadState(db, now);
     const after = structuredClone(before);
     let result: CommandResult;
     try {
@@ -137,12 +159,35 @@ export async function execute(
           before.revision,
         ),
     ];
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO days (id, last_number, next_sequence) SELECT ?, ?, ? WHERE ${guard}
+        ON CONFLICT(id) DO UPDATE SET last_number = excluded.last_number, next_sequence = excluded.next_sequence`,
+        )
+        .bind(
+          after.day.id,
+          after.day.lastNumber,
+          after.day.nextSequence,
+          operationId,
+          revision,
+        ),
+    );
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO inventory (day, counts) SELECT ?, ? WHERE ${guard}
+        ON CONFLICT(day) DO UPDATE SET counts = excluded.counts`,
+        )
+        .bind(after.day.id, JSON.stringify(after.stock), operationId, revision),
+    );
     if (changedOrders.length) {
       statements.push(
         db
           .prepare(
-            `INSERT INTO orders (id, number, status, priority_sequence, items, allocated, created_at, finished_at)
-        SELECT json_extract(value, '$.id'), json_extract(value, '$.number'), json_extract(value, '$.status'), json_extract(value, '$.prioritySequence'), json_extract(value, '$.items'),
+            `INSERT INTO orders (id, day, sequence, number, status, priority_sequence, items, allocated, created_at, finished_at)
+        SELECT json_extract(value, '$.id'), json_extract(value, '$.day'), json_extract(value, '$.sequence'),
+          json_extract(value, '$.number'), json_extract(value, '$.status'), json_extract(value, '$.prioritySequence'), json_extract(value, '$.items'),
           json_extract(value, '$.allocated'), json_extract(value, '$.createdAt'), json_extract(value, '$.finishedAt')
         FROM json_each(?) WHERE ${guard}
         ON CONFLICT(id) DO UPDATE SET status = excluded.status, priority_sequence = excluded.priority_sequence, allocated = excluded.allocated, finished_at = excluded.finished_at`,
@@ -165,16 +210,9 @@ export async function execute(
     statements.push(
       db
         .prepare(
-          `UPDATE app_state SET revision = ?, last_number = ?, stock = ? WHERE id = 1 AND revision = ? AND ${guard}`,
+          `UPDATE app_state SET revision = ? WHERE id = 1 AND revision = ? AND ${guard}`,
         )
-        .bind(
-          revision,
-          after.lastNumber,
-          JSON.stringify(after.stock),
-          before.revision,
-          operationId,
-          revision,
-        ),
+        .bind(revision, before.revision, operationId, revision),
     );
     try {
       const committed = await db.batch(statements);
@@ -202,9 +240,25 @@ export async function orderDetails(
   return row ? fromOrderRow(row) : null;
 }
 
-export async function history(db: D1Database): Promise<Order[]> {
+export async function history(db: D1Database, day: string): Promise<Order[]> {
   const result = await db
-    .prepare("SELECT * FROM orders ORDER BY number DESC")
+    .prepare("SELECT * FROM orders WHERE day = ? ORDER BY sequence DESC")
+    .bind(day)
     .all<OrderRow>();
   return result.results.map(fromOrderRow);
+}
+
+export async function listDays(db: D1Database): Promise<Day[]> {
+  const result = await db
+    .prepare("SELECT id, last_number, next_sequence FROM days ORDER BY id DESC")
+    .all<{
+      id: string;
+      last_number: number;
+      next_sequence: number;
+    }>();
+  return result.results.map((row) => ({
+    id: row.id,
+    lastNumber: row.last_number,
+    nextSequence: row.next_sequence,
+  }));
 }
