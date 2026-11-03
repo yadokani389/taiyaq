@@ -3,6 +3,7 @@ import {
   FLAVORS,
   zeroCounts,
   japanDate,
+  total,
   type Command,
   type CommandResult,
   type Counts,
@@ -44,10 +45,12 @@ export async function loadState(
   now = new Date(),
 ): Promise<StaffState> {
   const today = japanDate(now);
-  const [meta, days, stock, orders, flavors, sold] = await db.batch([
+  const [meta, days, stock, orders, flavors] = await db.batch([
     db.prepare("SELECT revision FROM app_state WHERE id = 1"),
     db
-      .prepare("SELECT id, last_number, next_sequence FROM days WHERE id = ?")
+      .prepare(
+        "SELECT id, last_number, next_sequence, sold_count FROM days WHERE id = ?",
+      )
       .bind(today),
     db.prepare("SELECT counts FROM inventory WHERE day = ?").bind(today),
     db
@@ -56,17 +59,13 @@ export async function loadState(
       )
       .bind(today),
     db.prepare("SELECT * FROM flavors"),
-    db
-      .prepare(
-        "SELECT COALESCE(SUM(item.value), 0) AS count FROM orders, json_each(orders.items) AS item WHERE orders.day = ? AND orders.status = 'completed'",
-      )
-      .bind(today),
   ]);
   const day = days!.results[0] as
     | {
         id: string;
         last_number: number;
         next_sequence: number;
+        sold_count: number;
       }
     | undefined;
   const settings = flavors!.results as Array<{
@@ -76,7 +75,7 @@ export async function loadState(
     per_batch: number;
   }>;
   return {
-    soldCount: (sold!.results[0] as { count: number }).count,
+    soldCount: day?.sold_count ?? 0,
     revision: (meta!.results[0] as { revision: number }).revision,
     day: {
       id: today,
@@ -168,13 +167,17 @@ export async function execute(
     statements.push(
       db
         .prepare(
-          `INSERT INTO days (id, last_number, next_sequence) SELECT ?, ?, ? WHERE ${guard}
-        ON CONFLICT(id) DO UPDATE SET last_number = excluded.last_number, next_sequence = excluded.next_sequence`,
+          `INSERT INTO days (id, last_number, next_sequence, sold_count) SELECT ?, ?, ?, ? WHERE ${guard}
+        ON CONFLICT(id) DO UPDATE SET last_number = excluded.last_number, next_sequence = excluded.next_sequence, sold_count = excluded.sold_count`,
         )
         .bind(
           after.day.id,
           after.day.lastNumber,
           after.day.nextSequence,
+          before.soldCount +
+            changedOrders
+              .filter(({ status }) => status === "completed")
+              .reduce((sum, order) => sum + total(order.items), 0),
           operationId,
           revision,
         ),

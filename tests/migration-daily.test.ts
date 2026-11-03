@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { Miniflare } from "miniflare";
 import { readFile, readdir } from "node:fs/promises";
 import { japanDate, zeroCounts } from "../src/shared";
@@ -23,11 +23,12 @@ async function database() {
   return db;
 }
 async function migrate(db: D1Database) {
-  const sql = await readFile(
-    "migrations/0007_restore_daily_orders.sql",
-    "utf8",
-  );
-  await db.exec(sql.replace(/\n/g, " "));
+  for (const file of (await readdir("migrations"))
+    .sort()
+    .filter((f) => f >= "0007")) {
+    const sql = await readFile(`migrations/${file}`, "utf8");
+    await db.exec(sql.replace(/\n/g, " "));
+  }
 }
 afterEach(async () => {
   await mf?.dispose();
@@ -80,6 +81,7 @@ it("retains continuous live data, numbers and operations in the current Japan da
   expect(japanDate()).toBe(today); // If migration crosses Japan midnight, retry the test.
   const state = await loadState(db);
   expect(state.revision).toBe(42);
+  expect(state.soldCount).toBe(2);
   expect(state.stock).toEqual(JSON.parse(stock));
   expect(state.day).toEqual({ id: today, lastNumber: 150, nextSequence: 6 });
   expect(state.orders.map((order) => order.id)).toEqual([
@@ -162,6 +164,61 @@ it("refuses to relabel previous-day orders as the cutover day", async () => {
   expect(await db.prepare("SELECT COUNT(*) AS n FROM orders").first("n")).toBe(
     1,
   );
+});
+
+it("keeps state reads bounded by active orders and counts concurrent completions once", async () => {
+  const db = await database();
+  const items = JSON.stringify({ ...zeroCounts(), tsubuan: 2 });
+  await db.batch([
+    db.prepare("UPDATE app_state SET last_number = 602 WHERE id = 1"),
+    db
+      .prepare(
+        `INSERT INTO orders (id, number, status, items, allocated, created_at)
+       SELECT 'order-' || value, value,
+         CASE WHEN value < 600 THEN 'completed' ELSE 'ready' END,
+         ?, ?, datetime('now') FROM json_each(?)`,
+      )
+      .bind(
+        items,
+        items,
+        JSON.stringify(Array.from({ length: 503 }, (_, i) => i + 100)),
+      ),
+  ]);
+  await migrate(db);
+  const batch = db.batch.bind(db);
+  let rowsRead = 0;
+  const spy = vi.spyOn(db, "batch").mockImplementation(async (statements) => {
+    const results = await batch(statements);
+    rowsRead += results.reduce((sum, result) => sum + result.meta.rows_read, 0);
+    return results;
+  });
+  let state;
+  try {
+    state = await loadState(db);
+  } finally {
+    spy.mockRestore();
+  }
+  expect(state.soldCount).toBe(1000);
+  expect(state.orders).toHaveLength(3);
+  expect(rowsRead).toBeLessThan(40);
+  const complete = {
+    type: "complete",
+    day: state.day.id,
+    orderId: "order-600",
+  } as const;
+  await Promise.all([
+    execute(db, "complete-600", complete),
+    execute(db, "complete-600", complete),
+    execute(db, "complete-601", { ...complete, orderId: "order-601" }),
+  ]);
+  await execute(db, "cancel-602", {
+    type: "cancel",
+    day: state.day.id,
+    orderId: "order-602",
+  });
+  expect((await loadState(db)).soldCount).toBe(1004);
+  const nextDay = new Date(Date.now() + 86400000);
+  expect((await loadState(db, nextDay)).soldCount).toBe(0);
 });
 
 it("migrates an empty continuous database and starts daily numbering at 100", async () => {
