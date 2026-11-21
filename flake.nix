@@ -31,8 +31,8 @@
               pkgs.nodejs
               pkgs.pnpm
             ]
-            ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.chromium ];
-            shellHook = lib.optionalString pkgs.stdenv.isLinux ''
+            ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.chromium ];
+            shellHook = lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
               export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="${lib.getExe pkgs.chromium}"
             '';
           };

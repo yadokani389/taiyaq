@@ -18,7 +18,19 @@ pnpm test:e2e
 
 ブラウザーテストにはChromiumが必要です（`pnpm exec playwright install chromium`）。
 
-## デプロイ
+## 文化祭後の静的デモ
+
+```sh
+pnpm build:demo
+pnpm preview:demo
+pnpm test:demo
+```
+
+静的デモの公開対象は `dist/demo/` だけです。通常の `pnpm run deploy` は注文管理用の Worker を公開します。デモの公開には使いません。
+
+本番データを非公開で退避してから、`dist/demo/` を Worker スクリプトや D1 接続のない Workers Static Assets として公開します。404 ページを有効にし、公開先に `/`、`/staff`、`/display`、`/order` があり、`/api/status` が 404 になることを確認します。旧 Worker のドメイン設定と稼働状態を確認してから、不要になった Workers Paid の契約を見直します。
+
+## 注文管理用 Worker のデプロイ
 
 接続先のD1は`cloudflare.config.ts`に設定します。
 本番用の`STAFF_API_TOKEN`をWorkerのsecretに設定してください。

@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "pnpm db:migrate:local && vp dev",
     "build": "vp build",
+    "build:demo": "vp build --mode demo && node scripts/demo-assets.mjs",
+    "preview:demo": "vp preview --mode demo",
     "test": "vp test run",
     "check": "vp check && vp test run && vp build",
     "typecheck": "vp check --no-fmt --no-lint",
     "db:migrate:local": "node scripts/migrate.ts --local",
     "db:migrate:remote": "node scripts/migrate.ts",
     "deploy": "pnpm check && cf deploy --prebuilt --mode production",
+    "test:demo": "pnpm build:demo && TAIYAQ_DEMO=1 playwright test",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -36,5 +39,6 @@
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "packageManager": "pnpm@12.21.0"
 }

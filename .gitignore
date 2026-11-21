@@ -5,3 +5,5 @@ node_modules/
 .pre-commit-config.yaml
 .env
 .dev.vars
+
+dist/

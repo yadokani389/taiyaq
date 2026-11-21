@@ -3,8 +3,11 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const demo = process.env.TAIYAQ_DEMO === "1";
+
 export default defineConfig({
   testDir: "tests/browser",
+  ...(demo ? { testMatch: "demo.spec.ts" } : { testIgnore: "demo.spec.ts" }),
   outputDir: "/tmp/taiyaq-playwright-results",
   workers: 1,
   timeout: 60000,
@@ -17,7 +20,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm dev",
+    command: demo ? "pnpm preview:demo --port 5174 --strictPort" : "pnpm dev",
     url: "http://127.0.0.1:5174",
     timeout: 60000,
     env: {

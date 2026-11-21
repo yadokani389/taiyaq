@@ -20,6 +20,9 @@ import { ApiError, sendCommand, usePolling } from "./api";
 import { QuantityPicker } from "./QuantityPicker";
 import { useStaffState } from "./useStaffState";
 import { useRecentReady } from "./useRecentReady";
+import { resetDemo } from "./demo";
+
+const demo = import.meta.env.MODE === "demo";
 
 type View = "order" | "settings" | "history";
 const views: Array<{ id: View; label: string; key: string }> = [
@@ -41,16 +44,16 @@ function storedRequest(): CommandRequest | undefined {
 }
 
 export function Staff() {
-  const [token, setToken] = useState(
-    () => sessionStorage.getItem("taiyaq:staff") ?? "",
+  const [token, setToken] = useState(() =>
+    demo ? "demo" : (sessionStorage.getItem("taiyaq:staff") ?? ""),
   );
   const [login, setLogin] = useState("");
   const [view, setView] = useState<View>("order");
   const [orderItems, setOrderItems] = useState<Counts>(zeroCounts);
   const [productionItems, setProductionItems] = useState<Counts>(zeroCounts);
   const [formVersion, setFormVersion] = useState({ order: 0, production: 0 });
-  const [pending, setPending] = useState<CommandRequest | undefined>(
-    storedRequest,
+  const [pending, setPending] = useState<CommandRequest | undefined>(() =>
+    demo ? undefined : storedRequest(),
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -103,7 +106,7 @@ export function Staff() {
     setNotice("");
     try {
       const result = await sendCommand(request, token);
-      sessionStorage.removeItem("taiyaq:pending");
+      if (!demo) sessionStorage.removeItem("taiyaq:pending");
       setPending(undefined);
       if (request.command.type === "order") {
         setOrderItems(zeroCounts());
@@ -138,19 +141,35 @@ export function Staff() {
         cause.status >= 400 &&
         cause.status < 500
       ) {
-        sessionStorage.removeItem("taiyaq:pending");
+        if (!demo) sessionStorage.removeItem("taiyaq:pending");
         setPending(undefined);
         setError(`${cause.message}（未登録）`);
-      } else setError("送信結果を確認できません。同じ操作を再送信してください");
+      } else if (demo)
+        setError(
+          "デモの変更を保存できません。ブラウザの保存設定を確認してください",
+        );
+      else setError("送信結果を確認できません。同じ操作を再送信してください");
     } finally {
       setBusy(false);
     }
   }
   function act(command: Command) {
     if (disabled) return;
-    const request = { operationId: crypto.randomUUID(), command };
-    sessionStorage.setItem("taiyaq:pending", JSON.stringify(request));
-    setPending(request);
+    const operationId =
+      demo && typeof crypto.randomUUID !== "function"
+        ? Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte, i) => {
+            const value =
+              i === 6 ? (byte & 15) | 64 : i === 8 ? (byte & 63) | 128 : byte;
+            const separator =
+              i === 4 || i === 6 || i === 8 || i === 10 ? "-" : "";
+            return separator + value.toString(16).padStart(2, "0");
+          }).join("")
+        : crypto.randomUUID();
+    const request = { operationId, command };
+    if (!demo) {
+      sessionStorage.setItem("taiyaq:pending", JSON.stringify(request));
+      setPending(request);
+    }
     void transmit(request);
   }
   function submit(type: "order" | "production") {
@@ -291,8 +310,8 @@ export function Staff() {
   return (
     <>
       <header className="app-header">
-        <a className="brand" href="/staff">
-          taiyaq<span>スタッフ</span>
+        <a className="brand" href={demo ? "/" : "/staff"}>
+          taiyaq<span>{demo ? "スタッフ操作デモ" : "スタッフ"}</span>
         </a>
         <nav aria-label="操作画面">
           {views.map(({ id, label, key }) => (
@@ -313,20 +332,45 @@ export function Staff() {
               販売済み <strong>{state.soldCount}</strong>個
             </div>
           ) : null}
-          <button
-            className="text-button"
-            disabled={disabled}
-            onClick={() => {
-              sessionStorage.removeItem("taiyaq:staff");
-              setToken("");
-            }}
-          >
-            ログアウト
-          </button>
+          {demo ? (
+            <button
+              className="text-button"
+              disabled={disabled}
+              onClick={async () => {
+                if (
+                  !window.confirm("このブラウザのデモを初期状態に戻しますか？")
+                )
+                  return;
+                try {
+                  await resetDemo();
+                  location.reload();
+                } catch {
+                  setError(
+                    "デモを初期状態に戻せませんでした。ブラウザの保存設定を確認してください",
+                  );
+                }
+              }}
+            >
+              デモを初期状態に戻す
+            </button>
+          ) : (
+            <button
+              className="text-button"
+              disabled={disabled}
+              onClick={() => {
+                sessionStorage.removeItem("taiyaq:staff");
+                setToken("");
+              }}
+            >
+              ログアウト
+            </button>
+          )}
         </div>
       </header>
       <div className="service-bar">
-        <span>{day ?? "読み込み中…"}</span>
+        <span>
+          {demo ? "架空の注文を操作できます" : (day ?? "読み込み中…")}
+        </span>
         <Freshness
           error={poll.error}
           updatedAt={poll.updatedAt}

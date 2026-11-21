@@ -9,6 +9,9 @@ import {
 import { usePolling } from "./api";
 import { Freshness } from "./Staff";
 
+const demo = import.meta.env.MODE === "demo";
+const orderKey = demo ? "taiyaq:demo:order" : "taiyaq:order";
+
 export function Public({ display = false }: { display?: boolean }) {
   useEffect(() => {
     if (!display) return;
@@ -37,7 +40,7 @@ export function Public({ display = false }: { display?: boolean }) {
   const [selected, setSelected] = useState<string | null>(
     () =>
       new URLSearchParams(location.search).get("order") ??
-      localStorage.getItem("taiyaq:order"),
+      localStorage.getItem(orderKey),
   );
   const detail = usePolling<{ order: PublicOrder; waitMinutes: number }>(
     !display && selected ? `/api/orders/${encodeURIComponent(selected)}` : null,
@@ -45,13 +48,13 @@ export function Public({ display = false }: { display?: boolean }) {
   function selectOrder(id: string) {
     setSearchError("");
     setSelected(id);
-    localStorage.setItem("taiyaq:order", id);
+    localStorage.setItem(orderKey, id);
     const url = new URL(location.href);
     url.searchParams.set("order", id);
     history.replaceState(null, "", url);
   }
   const data = status.data;
-  const publicUrl = new URL("/", location.href).href;
+  const publicUrl = new URL(demo ? "/order" : "/", location.href).href;
   const ready = data?.orders.filter(({ status }) => status === "ready") ?? [];
   const waiting =
     data?.orders.filter(({ status }) => status === "waiting") ?? [];
@@ -59,7 +62,14 @@ export function Public({ display = false }: { display?: boolean }) {
     <div className={display ? "display-page" : "public-page"}>
       <header className="public-header">
         <a className="brand" href="/">
-          taiyaq<span>たい焼き</span>
+          taiyaq
+          <span>
+            {demo
+              ? display
+                ? "店頭モニターデモ"
+                : "来場者向けデモ"
+              : "たい焼き"}
+          </span>
         </a>
         <Freshness error={status.error} updatedAt={status.updatedAt} />
       </header>
@@ -249,7 +259,9 @@ export function Public({ display = false }: { display?: boolean }) {
                   role="img"
                   title="注文状況ページのQRコード"
                 />
-                <span>スマホで注文状況を確認</span>
+                <span>
+                  {demo ? "来場者向けデモを開く" : "スマホで注文状況を確認"}
+                </span>
               </a>
             </footer>
           )}
